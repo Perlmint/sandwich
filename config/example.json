@@ -1,0 +1,27 @@
+{
+    "remote": {
+        "slack": {
+            "protocol": "slack",
+            "token": ""
+        },
+        "discord": {
+            "protocol": "discord",
+            "token": ""
+        }
+    },
+    "bridge": [
+        {
+            "name_format": "${display_name}@${protocol}",
+            "remotes": [
+                "slack",
+                "discord"
+            ]
+        }
+    ],
+    "audio_stream": [
+        {
+            "remote": "discord",
+            "channel": ""
+        }
+    ]
+}
