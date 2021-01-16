@@ -11,10 +11,18 @@
     },
     "bridge": [
         {
-            "name_format": "${display_name}@${protocol}",
+            "name_format": "<display_name>@<protocol>",
             "remotes": [
-                "slack",
-                "discord"
+                {
+                    "name": "slack",
+                    "channel": "",
+                    "direction": "inout"
+                },
+                {
+                    "name": "discord",
+                    "channel": "",
+                    "direction": "inout"
+                }
             ]
         }
     ],
