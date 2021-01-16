@@ -4,7 +4,9 @@
   "description": "Cutting it like star as cute",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc && npm run config-schema",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "config-schema": "typescript-json-schema ./src/config_def.ts Config -o config_schema.json"
   },
   "repository": {
     "type": "git",
@@ -29,7 +31,7 @@
   },
   "dependencies": {
     "@slack/web-api": "^6.0.0",
-    "config": "^3.3.3",
-    "discord.js": "^12.5.1"
+    "discord.js": "^12.5.1",
+    "eventemitter3": "^3.1.2"
   }
 }
