@@ -1,0 +1,12 @@
+{
+  "plugins": [
+    "@babel/plugin-proposal-class-properties",
+    ["@babel/plugin-transform-typescript",
+      {
+        "allowNamespaces": true
+      }
+    ],
+    "@babel/plugin-syntax-top-level-await"
+  ],
+  "sourceMaps": true
+}

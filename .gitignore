@@ -211,7 +211,7 @@ $RECYCLE.BIN/
 
 # End of https://www.toptal.com/developers/gitignore/api/node,visualstudiocode,windows,macos,linux,git
 
-/out/
+/lib/
 /config/*
 !/config/example.json
 /config_schema.json
