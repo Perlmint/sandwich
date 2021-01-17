@@ -5,8 +5,9 @@ import { Remote } from './remote.js';
 
 export class DiscordRemote extends EventEmitter implements Remote {
   private client: Client;
+  private guild!: Guild;
 
-  public constructor () {
+  public constructor (private server: string) {
     super();
 
     this.client = new Client();
@@ -14,6 +15,15 @@ export class DiscordRemote extends EventEmitter implements Remote {
 
   public async init (token: string) {
     await this.client.login(token);
+
+    const guild = await this.client.guilds.resolve(this.server);
+    if (!guild) {
+      throw Error(`Can't resolve guild ${this.server}`);
+    }
+
+    this.guild = guild;
+
+    return new Promise<void>((resolve) => this.client.once('ready', resolve));
   }
 
   public async joinTextChannel (channel: ChannelSpec): Promise<string> {

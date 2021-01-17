@@ -20,7 +20,7 @@ for (const name of Object.keys(config.remote)) {
     let remote: Remote;
     switch (remoteCfg.protocol) {
       case 'discord': {
-        const newRemote = new DiscordRemote();
+        const newRemote = new DiscordRemote(remoteCfg.server);
         await newRemote.init(remoteCfg.token);
         remote = newRemote;
         break;

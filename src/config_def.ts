@@ -6,6 +6,7 @@ export interface SlackRemote {
 export interface DiscordRemote {
   protocol: 'discord',
   token: string,
+  server: string,
 }
 
 export type Remote = SlackRemote | DiscordRemote;
