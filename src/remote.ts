@@ -15,7 +15,7 @@ export const message = Symbol('Event:Message');
 export interface Remote {
   // return channel id
   joinTextChannel(channel: ChannelSpec): Promise<string>;
-  joinVoiceChannel(channel: ChannelSpec): Promise<ReadableStream>;
+  joinVoiceChannel?(channel: ChannelSpec): Promise<ReadableStream>;
   sendMessage(channel: string, userName: string, userIcon: string, message: string): Promise<void>;
 
   // event emitter
