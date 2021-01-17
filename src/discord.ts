@@ -1,7 +1,7 @@
 import { Client } from 'discord.js';
-import { EventEmitter } from 'eventemitter3';
-import { ChannelSpec } from './config';
-import { Remote } from './remote';
+import EventEmitter from 'eventemitter3';
+import { ChannelSpec } from './config.js';
+import { Remote } from './remote.js';
 
 export class DiscordRemote extends EventEmitter implements Remote {
   private client: Client;

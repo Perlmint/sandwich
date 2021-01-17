@@ -1,6 +1,6 @@
-import config from './config';
-import { DiscordRemote } from './discord';
-import { EventType, Remote } from './remote';
+import config from './config.js';
+import { DiscordRemote } from './discord.js';
+import { EventType, Remote } from './remote.js';
 
 interface TextBridge {
   nameFormat: string,

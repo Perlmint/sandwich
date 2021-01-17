@@ -1,4 +1,4 @@
-import { ChannelSpec } from './config';
+import { ChannelSpec } from './config.js';
 
 export interface MessageEvent {
     channelId: string,

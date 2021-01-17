@@ -1,7 +1,7 @@
 import { readFile } from 'fs';
 
-import { Config } from './config_def';
-export * from './config_def';
+import { Config } from './config_def.js';
+export * from './config_def.js';
 
 const config: Config = await new Promise((resolve, reject) => {
   readFile('config/default.json', { encoding: 'utf-8' }, (e, d) => {
