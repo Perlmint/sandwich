@@ -1,6 +1,8 @@
+import 'source-map-support';
 import config from './config.js';
 import { DiscordRemote } from './discord.js';
 import { EventType, Remote } from './remote.js';
+import { SlackRemote } from './slack.js';
 
 interface TextBridge {
   nameFormat: string,
@@ -25,8 +27,12 @@ for (const name of Object.keys(config.remote)) {
         remote = newRemote;
         break;
       }
-      case 'slack':
-        throw new Error('Not yet implemented');
+      case 'slack': {
+        const newRemote = new SlackRemote(remoteCfg.token);
+        await newRemote.init();
+        remote = newRemote;
+        break;
+      }
       default:
         throw new Error(`Unknown remote protocol : ${remoteCfg!.protocol}`);
     }

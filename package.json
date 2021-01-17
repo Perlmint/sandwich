@@ -27,6 +27,7 @@
     "@babel/plugin-syntax-top-level-await": "^7.12.1",
     "@babel/plugin-transform-typescript": "^7.12.1",
     "@babel/preset-env": "^7.12.11",
+    "@slack/types": "^1.10.0",
     "@typescript-eslint/eslint-plugin": "^4.13.0",
     "@typescript-eslint/parser": "^4.13.0",
     "eslint": "^7.17.0",
@@ -38,6 +39,7 @@
     "typescript-json-schema": "^0.47.0"
   },
   "dependencies": {
+    "@slack/rtm-api": "^6.0.0",
     "@slack/web-api": "^6.0.0",
     "discord.js": "^12.5.1",
     "eventemitter3": "^3.1.2",
