@@ -42,7 +42,7 @@ for (const name of Object.keys(config.remote)) {
       textBridges: {}
     };
   } catch (e) {
-
+    console.error(e);
   }
 }
 
@@ -61,6 +61,10 @@ if (config.bridge) {
       };
 
       const inRemote = remotes[inRemoteCfg.name];
+      if (!inRemote) {
+        console.error(`Remote not found - ${inRemoteCfg.name}`);
+        continue;
+      }
       const channelId = await inRemote.remote.joinTextChannel(inRemoteCfg);
 
       inRemote.textBridges[channelId] = bridge;
@@ -92,9 +96,8 @@ for (const remote of Object.values(remotes)) {
     const bridge = remote.textBridges[event.channelId];
     if (bridge) {
       for (const [outRemote, channel] of bridge.out) {
-        // TODO: log error
         // TODO: format username properly
-        outRemote.sendMessage(channel, event.userName, event.userIcon, event.message);
+        outRemote.sendMessage(channel, event.userName, event.userIcon, event.message).catch((e) => console.error(e));
       }
     }
   });
