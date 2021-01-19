@@ -121,11 +121,11 @@ if (config.gamify) {
     const game = gameMap.get(gamify.name)
 
     // target 등록
-    let targetRemotes: Remote[] = [];
+    let targetRemotes: [Remote, string][] = [];
     for (const targetRemoteConfig of gamify.targets) {
       const targetRemote = remotes[targetRemoteConfig.name];
       const channelId = await targetRemote.remote.joinTextChannel(targetRemoteConfig);
-      // 이걸 등록한다 pair로 -> [channelId, gamify.command]
+      targetRemotes.push([targetRemote.remote, channelId])
     }
 
     // from 등록

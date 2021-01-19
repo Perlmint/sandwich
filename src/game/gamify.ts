@@ -5,7 +5,7 @@ export interface Game {
   name: string,
 
   // do game
-  doWork(remotes: Remote[]): void;
+  doWork(remotes: [Remote, string][]): void;
 };
 
 export function getGames(): Map<string, Game> {
