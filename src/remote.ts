@@ -6,13 +6,13 @@ export interface UserInfo {
 }
 
 export interface MessageEvent extends UserInfo {
-    channelId: string,
-    userIcon: string,
-    message: string,
+  channelId: string,
+  userIcon: string,
+  message: string,
 }
 
 export namespace EventType {
-export const message = Symbol('Event:Message');
+  export const message = Symbol('Event:Message');
 }
 
 export interface Remote {
