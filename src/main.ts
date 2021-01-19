@@ -3,7 +3,7 @@ import config from './config.js';
 import { DiscordRemote } from './discord.js';
 import { EventType, Remote } from './remote.js';
 import { SlackRemote } from './slack.js';
-import { getGames } from './game/gamify.js'
+import { Game, GameConstructable, makeGameObj, getGames } from './game/gamify.js'
 
 interface TextBridge {
   nameFormat: string,
@@ -110,31 +110,39 @@ for (const [, remote] of remotes) {
 
 // TODO: init gamify settings
 let gameMap = getGames();
+let games: Game[] = [];
 
 if (config.gamify) {
   const gamifyConfig = config.gamify
   for (const gamify of gamifyConfig) {
-    // config의 네임으로 gamify.ts의 로직을 불러오기.
-    const game = gameMap.get(gamify.name)
+    // config의 네임으로 gamify.ts의 game을 불러오기.
+    const gameCtr = gameMap.get(gamify.name)
 
-    // target 등록
-    let targetRemotes: [Remote, string][] = [];
-    for (const targetRemoteConfig of gamify.targets) {
-      const targetRemote = remotes[targetRemoteConfig.name];
-      const channelId = await targetRemote.remote.joinTextChannel(targetRemoteConfig);
-      targetRemotes.push([targetRemote.remote, channelId])
-    }
+    if (gameCtr) {
+      // target 등록
+      let targetRemotes: [Remote, string][] = [];
+      for (const targetRemoteConfig of gamify.targets) {
+        const targetRemote = remotes[targetRemoteConfig.name];
+        const channelId = await targetRemote.remote.joinTextChannel(targetRemoteConfig);
+        targetRemotes.push([targetRemote.remote, channelId])
+      }
 
-    // from 등록
-    let fromRemotes: Remote[] = []
-    for (const fromRemoteConfig of gamify.from) {
-      const fromRemote = remotes[fromRemoteConfig.name];
-      const channelId = await fromRemote.remote.joinTextChannel(fromRemoteConfig);
+      // from 등록
+      let fromRemotes: [Remote, string][] = []
+      for (const fromRemoteConfig of gamify.from) {
+        const fromRemote = remotes[fromRemoteConfig.name];
+        const channelId = await fromRemote.remote.joinTextChannel(fromRemoteConfig);
+      }
 
-      fromRemote.remote.on(EventType.message, (event) => {
-        if (event.channelId == channelId && event.message == gamify.command)
-          game?.doWork(targetRemotes)
-      });
+      let game = makeGameObj(gameCtr, fromRemotes);
+      games.push(game);
+
+      for (const [rm, cId] of fromRemotes) {
+        rm.on(EventType.message, (event) => {
+          if (event.channelId == cId && game.match(event.message, gamify.command))
+            game.doWork(targetRemotes)
+        });
+      }
     }
   }
 }
