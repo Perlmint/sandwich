@@ -1,15 +1,15 @@
 import { ChannelSpec } from './config.js';
 
 export interface MessageEvent {
-    channelId: string,
-    userName: string,
-    userId: string,
-    userIcon: string,
-    message: string,
+  channelId: string,
+  userName: string,
+  userId: string,
+  userIcon: string,
+  message: string,
 }
 
 export namespace EventType {
-export const message = Symbol('Event:Message');
+  export const message = Symbol('Event:Message');
 }
 
 export interface Remote {

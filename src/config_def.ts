@@ -37,8 +37,16 @@ export interface AudioStream {
   channel: string,
 }
 
+export interface Gamify {
+  name: string,
+  command: string,
+  from: BridgeRemote[],
+  targets: BridgeRemote[]
+}
+
 export interface Config {
-  remote: {[name: string]: Remote},
+  remote: { [name: string]: Remote },
   bridge?: Bridge[],
   audioStream?: AudioStream[],
+  gamify?: Gamify[]
 }
