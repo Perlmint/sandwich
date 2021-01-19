@@ -5,7 +5,7 @@ import { EventType, MessageEvent, Remote } from './remote.js';
 
 export class DiscordRemote extends EventEmitter implements Remote {
   private client: Client;
-  private webhooks: Map<string, Webhook> = new Map();
+  private webhooks: { [channelId: string]: Webhook } = {};
   private listenChannels: Map<string, GuildChannel> = new Map();
   private guild!: Guild;
 
@@ -94,7 +94,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
   }
 
   public async sendMessage(channelName: string, userName: string, userIcon: string, message: string): Promise<void> {
-    const webhook = this.webhooks.get(channelName);
+    const webhook = this.webhooks[channelName];
     if (webhook) {
       await webhook.send(
         message,
