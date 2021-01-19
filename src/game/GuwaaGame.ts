@@ -8,9 +8,9 @@ export class GuwaaGame implements Game {
     this.name = "guwaa";
   }
 
-  doWork(remotes: [Remote, string][][]): void {
+  doWork(remotes: [Remote, string][]): void {
     for (const [remote, channelId] of remotes) {
-      remote.sendMessage(channelId, "GUWAA BOT", "test icon", "test message").catch((e) => console.error(e));
+      remote.sendMessageDefault(channelId, "test message").catch((e) => console.error(e));
     }
   }
 }
