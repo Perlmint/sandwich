@@ -5,7 +5,7 @@ import { EventType, MessageEvent, Remote } from './remote.js';
 
 export class DiscordRemote extends EventEmitter implements Remote {
   private client: Client;
-  private webhooks: {[channelId: string]: Webhook} = {};
+  private webhooks: Map<string, Webhook> = new Map();
   private listenChannels: Map<string, GuildChannel> = new Map();
   private guild!: Guild;
 
@@ -76,7 +76,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
             if (!webhook) {
               webhook = await textChannel.createWebhook('sandwich');
             }
-            this.webhooks[channel.id] = webhook;
+            this.webhooks.set(channel.id, webhook);
           }
         } else {
           throw new Error(`channel ${channel.name}(${channel.id}) is not a text channel`);
@@ -94,7 +94,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
   }
 
   public async sendMessage(channelName: string, userName: string, userIcon: string, message: string): Promise<void> {
-    const webhook = this.webhooks[channelName];
+    const webhook = this.webhooks.get(channelName);
     if (webhook) {
       await webhook.send(
         message,

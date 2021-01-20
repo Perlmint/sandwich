@@ -9,10 +9,12 @@ interface TextBridge {
   out: [Remote, string][],
 }
 
-const remotes: {[name: string]: {
+interface RemoteInstance {
   remote: Remote,
-  textBridges: {[channelId: string]: TextBridge}
-}} = {};
+  textBridges: {[channelId: string]: TextBridge},
+}
+
+const remotes: Map<string, RemoteInstance> = new Map();
 
 // init remotes
 for (const name of Object.keys(config.remote)) {
@@ -37,10 +39,10 @@ for (const name of Object.keys(config.remote)) {
         throw new Error(`Unknown remote protocol : ${remoteCfg!.protocol}`);
     }
 
-    remotes[name] = {
+    remotes.set(name, {
       remote,
       textBridges: {}
-    };
+    });
   } catch (e) {
     console.error(e);
   }
@@ -60,7 +62,7 @@ if (config.bridge) {
         out: []
       };
 
-      const inRemote = remotes[inRemoteCfg.name];
+      const inRemote = remotes.get(inRemoteCfg.name);
       if (!inRemote) {
         console.error(`Remote not found - ${inRemoteCfg.name}`);
         continue;
@@ -79,8 +81,8 @@ if (config.bridge) {
           continue;
         }
 
-        const outRemote = remotes[outRemoteCfg.name];
-        if (outRemote == null) {
+        const outRemote = remotes.get(outRemoteCfg.name);
+        if (!outRemote) {
           // TODO: log invalid out error
           continue;
         }
@@ -91,7 +93,7 @@ if (config.bridge) {
   }
 }
 
-for (const remote of Object.values(remotes)) {
+for (const [, remote] of remotes) {
   remote.remote.on(EventType.message, (event) => {
     const bridge = remote.textBridges[event.channelId];
     if (bridge) {
