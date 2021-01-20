@@ -9,13 +9,13 @@ export class DiscordRemote extends EventEmitter implements Remote {
   private listenChannels: Map<string, GuildChannel> = new Map();
   private guild!: Guild;
 
-  public constructor (private server: string) {
+  public constructor(private server: string) {
     super();
 
     this.client = new Client();
   }
 
-  public async init (token: string) {
+  public async init(token: string) {
     await this.client.login(token);
 
     const guild = await this.client.guilds.resolve(this.server);
@@ -57,7 +57,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
   // Discord doesn't have joining text channel.
   // Simply verify channel & return channel id
   // if possible, create webhook
-  public async joinTextChannel (channelSpec: ChannelSpec): Promise<string> {
+  public async joinTextChannel(channelSpec: ChannelSpec): Promise<string> {
     let channel: GuildChannel | undefined | null = null;
     if ('channelName' in channelSpec) {
       channel = this.guild.channels.cache.find(ch => ch.name === channelSpec.channelName);
@@ -89,11 +89,11 @@ export class DiscordRemote extends EventEmitter implements Remote {
     }
   }
 
-  public async joinVoiceChannel (channel: ChannelSpec): Promise<ReadableStream<any>> {
+  public async joinVoiceChannel(channel: ChannelSpec): Promise<ReadableStream<any>> {
     throw new Error('Method not implemented.');
   }
 
-  public async sendMessage (channelName: string, userName: string, userIcon: string, message: string): Promise<void> {
+  public async sendMessage(channelName: string, userName: string, userIcon: string, message: string): Promise<void> {
     const webhook = this.webhooks[channelName];
     if (webhook) {
       await webhook.send(

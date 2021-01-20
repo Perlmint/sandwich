@@ -34,14 +34,14 @@ export class SlackRemote extends EventEmitter implements Remote {
   private userCache: Map<string, SlackUser> = new Map();
   private channelCache: Map<string, SlackChannel> = new Map();
 
-  public constructor (token: string) {
+  public constructor(token: string) {
     super();
 
     this.rtmClient = new RTMClient(token);
     this.webClient = new WebClient(token);
   }
 
-  public async init (): Promise<void> {
+  public async init(): Promise<void> {
     await Promise.all([this.updateUserCache(), this.updateChannelCache()]);
     this.rtmClient.on('message', async (event: SlackMessageEvent) => {
       if (event.subtype === 'bot_message') {
@@ -58,7 +58,7 @@ export class SlackRemote extends EventEmitter implements Remote {
     await this.rtmClient.start();
   }
 
-  private async getUser (userID: string): Promise<SlackUser> {
+  private async getUser(userID: string): Promise<SlackUser> {
     const user = this.userCache.get(userID);
     if (user) {
       return user;
@@ -67,7 +67,7 @@ export class SlackRemote extends EventEmitter implements Remote {
     throw new Error('Cache invalid');
   }
 
-  private async updateUserCache (): Promise<void> {
+  private async updateUserCache(): Promise<void> {
     const resp = (await this.webClient.users.list()) as WebAPICallResult & { members: SlackUser[] };
 
     const newCache = new Map();
@@ -78,7 +78,7 @@ export class SlackRemote extends EventEmitter implements Remote {
     this.userCache = newCache;
   }
 
-  private async updateChannelCache (): Promise<void> {
+  private async updateChannelCache(): Promise<void> {
     const resp = (await this.webClient.conversations.list()) as WebAPICallResult & { channels: SlackChannel[] };
 
     const newCache = new Map();
@@ -88,7 +88,7 @@ export class SlackRemote extends EventEmitter implements Remote {
     this.channelCache = newCache;
   }
 
-  private async getChannel (channelSpec: ChannelSpec): Promise<SlackChannel> {
+  private async getChannel(channelSpec: ChannelSpec): Promise<SlackChannel> {
     if ('channelId' in channelSpec) {
       const channel = this.channelCache.get(channelSpec.channelId);
       if (channel) {
@@ -105,7 +105,7 @@ export class SlackRemote extends EventEmitter implements Remote {
     throw new Error('Cache invalid');
   }
 
-  public async joinTextChannel (channelSpec: ChannelSpec): Promise<string> {
+  public async joinTextChannel(channelSpec: ChannelSpec): Promise<string> {
     const channel = await this.getChannel(channelSpec);
     if (channel.is_member) {
       return channel.id;
@@ -119,7 +119,7 @@ export class SlackRemote extends EventEmitter implements Remote {
     }
   }
 
-  public async sendMessage (channel: string, userName: string, userIcon: string, message: string): Promise<void> {
+  public async sendMessage(channel: string, userName: string, userIcon: string, message: string): Promise<void> {
     const resp = await this.webClient.chat.postMessage({
       channel: channel,
       text: message,
