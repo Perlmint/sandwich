@@ -1,6 +1,6 @@
 import { RTMClient } from '@slack/rtm-api';
 import { MessageAttachment } from '@slack/types';
-import { WebAPICallResult, WebClient } from '@slack/web-api';
+import { ConversationsListArguments, UsersListArguments, WebAPICallResult, WebClient } from '@slack/web-api';
 import EventEmitter from 'eventemitter3';
 import { ChannelSpec } from './config_def.js';
 import { EventType, Remote, MessageEvent } from './remote.js';
@@ -25,6 +25,16 @@ interface SlackChannel {
   id: string,
   name: string,
   is_member: boolean,
+}
+
+interface UserListResp {
+  members: SlackUser[],
+  next_cursor?: string,
+}
+
+interface ChannelListResp {
+  channels: SlackChannel[],
+  next_cursor?: string,
 }
 /* eslint-enable camelcase */
 
@@ -64,26 +74,44 @@ export class SlackRemote extends EventEmitter implements Remote {
       return user;
     }
 
-    throw new Error('Cache invalid');
+    throw new Error(`Cache invalid ${userID}`);
   }
 
   private async updateUserCache(): Promise<void> {
-    const resp = (await this.webClient.users.list()) as WebAPICallResult & { members: SlackUser[] };
-
+    const arg: UsersListArguments = {};
     const newCache = new Map();
-    for (const user of resp.members) {
-      newCache.set(user.id, user);
+    while (true) {
+      const resp = (await this.webClient.users.list(arg)) as WebAPICallResult & UserListResp;
+
+      for (const user of resp.members) {
+        newCache.set(user.id, user);
+      }
+
+      if (resp.next_cursor == null) {
+        break;
+      }
+
+      arg.cursor = resp.next_cursor;
     }
 
     this.userCache = newCache;
   }
 
   private async updateChannelCache(): Promise<void> {
-    const resp = (await this.webClient.conversations.list()) as WebAPICallResult & { channels: SlackChannel[] };
-
+    const arg: ConversationsListArguments = {};
     const newCache = new Map();
-    for (const channel of resp.channels) {
-      newCache.set(channel.id, channel);
+    while (true) {
+      const resp = (await this.webClient.conversations.list(arg)) as WebAPICallResult & ChannelListResp;
+
+      for (const channel of resp.channels) {
+        newCache.set(channel.id, channel);
+      }
+
+      if (resp.next_cursor == null) {
+        break;
+      }
+
+      arg.cursor = resp.next_cursor;
     }
     this.channelCache = newCache;
   }
