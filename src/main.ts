@@ -105,4 +105,6 @@ for (const [, remote] of remotes) {
   });
 }
 
+console.log('Bot is ready!');
+
 // TODO: stream audio channel as streaming
