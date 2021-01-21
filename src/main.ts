@@ -10,12 +10,12 @@ interface TextBridge {
   out: [Remote, string][],
 }
 
-const remotes: {
-  [name: string]: {
-    remote: Remote,
-    textBridges: { [channelId: string]: TextBridge }
-  }
-} = {};
+interface RemoteInstance {
+  remote: Remote,
+  textBridges: { [channelId: string]: TextBridge },
+}
+
+const remotes: Map<string, RemoteInstance> = new Map();
 
 // init remotes
 for (const name of Object.keys(config.remote)) {
@@ -122,16 +122,21 @@ if (config.gamify) {
       // target 등록
       let targetRemotes: [Remote, string][] = [];
       for (const targetRemoteConfig of gamify.targets) {
-        const targetRemote = remotes[targetRemoteConfig.name];
-        const channelId = await targetRemote.remote.joinTextChannel(targetRemoteConfig);
-        targetRemotes.push([targetRemote.remote, channelId])
+        const targetRemote = remotes.get(targetRemoteConfig.name)?.remote;
+        if (targetRemote) {
+          const channelId = await targetRemote.joinTextChannel(targetRemoteConfig);
+          targetRemotes.push([targetRemote, channelId])
+        }
       }
 
       // from 등록
       let fromRemotes: [Remote, string][] = []
       for (const fromRemoteConfig of gamify.from) {
-        const fromRemote = remotes[fromRemoteConfig.name];
-        const channelId = await fromRemote.remote.joinTextChannel(fromRemoteConfig);
+        const fromRemote = remotes.get(fromRemoteConfig.name)?.remote;
+        if (fromRemote) {
+          const channelId = await fromRemote.joinTextChannel(fromRemoteConfig);
+          fromRemotes.push([fromRemote, channelId])
+        }
       }
 
       let game = makeGameObj(gameCtr, fromRemotes);
