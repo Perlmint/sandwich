@@ -1,9 +1,12 @@
 import { ChannelSpec } from './config.js';
 
-export interface MessageEvent {
+export interface UserInfo {
+  userName: string,
+  userId: string,
+}
+
+export interface MessageEvent extends UserInfo {
     channelId: string,
-    userName: string,
-    userId: string,
     userIcon: string,
     message: string,
 }
@@ -13,6 +16,7 @@ export const message = Symbol('Event:Message');
 }
 
 export interface Remote {
+  readonly protocol: string;
   // return channel id
   joinTextChannel(channel: ChannelSpec): Promise<string>;
   joinVoiceChannel?(channel: ChannelSpec): Promise<ReadableStream>;

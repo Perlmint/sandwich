@@ -9,6 +9,8 @@ export class DiscordRemote extends EventEmitter implements Remote {
   private listenChannels: Map<string, GuildChannel> = new Map();
   private guild!: Guild;
 
+  public readonly protocol = 'discord';
+
   public constructor(private server: string) {
     super();
 
