@@ -15,12 +15,12 @@
             "remotes": [
                 {
                     "name": "slack",
-                    "channel": "",
+                    "channelName": "",
                     "direction": "inout"
                 },
                 {
                     "name": "discord",
-                    "channel": "",
+                    "channelName": "",
                     "direction": "inout"
                 }
             ]
