@@ -1,6 +1,7 @@
 import 'source-map-support';
 import config from './config.js';
 import { DiscordRemote } from './discord.js';
+import { formatName } from './name.js';
 import { EventType, Remote } from './remote.js';
 import { SlackRemote } from './slack.js';
 
@@ -97,9 +98,9 @@ for (const [, remote] of remotes) {
   remote.remote.on(EventType.message, (event) => {
     const bridge = remote.textBridges[event.channelId];
     if (bridge) {
+      const username = formatName(bridge.nameFormat, event, remote.remote.protocol);
       for (const [outRemote, channel] of bridge.out) {
-        // TODO: format username properly
-        outRemote.sendMessage(channel, event.userName, event.userIcon, event.message).catch((e) => console.error(e));
+        outRemote.sendMessage(channel, username, event.userIcon, event.message).catch((e) => console.error(e));
       }
     }
   });
