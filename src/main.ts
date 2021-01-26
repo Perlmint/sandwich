@@ -5,6 +5,8 @@ import { formatName } from './name.js';
 import { EventType, Remote } from './remote.js';
 import { SlackRemote } from './slack.js';
 import { Game, getGames } from './game/gamify.js';
+import initTTS from './tts.js';
+import { sample } from './utils.js';
 
 interface TextBridge {
   nameFormat: string,
@@ -107,9 +109,58 @@ for (const [, remote] of remotes) {
   });
 }
 
-console.log('Bot is ready!');
+const TTS = config.tts ? await initTTS(config.tts) : undefined;
 
 // TODO: stream audio channel as streaming
+if (config.audioStream) {
+  const remoteReferenceCounter: Map<string, number> = new Map();
+  for (const stream of config.audioStream) {
+    const remoteInst = remotes.get(stream.remote);
+
+    if (remoteInst == null) {
+      console.error(`Invalid remote name is used for audioStream - ${stream.remote}`);
+      continue;
+    }
+
+    const remote = remoteInst.remote;
+
+    let refCount = remoteReferenceCounter.get(stream.remote) ?? 0;
+    refCount++;
+    if (refCount > 1) {
+      if (!remote.supportMultiVoice) {
+        console.error(`Remote ${stream.remote} is referenced multiple times for audioStream. But It doesn't support multiple voice`);
+        continue;
+      }
+    }
+
+    if (!remote.joinVoiceChannel) {
+      console.error(`Remote ${stream.remote} does not support voice channel`);
+      continue;
+    }
+
+    const [channelId,, sender] = await remote.joinVoiceChannel(stream);
+
+    if (stream.enteranceAudioNotification) {
+      const format = stream.enteranceAudioNotification.format;
+      remote.on(EventType.joinChannel, async (channelJoin) => {
+        if (channelJoin.channelId !== channelId) {
+          return;
+        }
+
+        sender.play(await TTS!(formatName(sample(format.join)!, channelJoin, remote.protocol)));
+      });
+      remote.on(EventType.leaveChannel, async (channelJoin) => {
+        if (channelJoin.channelId !== channelId) {
+          return;
+        }
+
+        sender.play(await TTS!(formatName(sample(format.leave)!, channelJoin, remote.protocol)));
+      });
+    }
+  }
+}
+
+console.log('Bot is ready!');
 
 // TODO: init gamify settings
 const gameMap = getGames();
