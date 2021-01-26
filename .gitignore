@@ -215,3 +215,4 @@ $RECYCLE.BIN/
 /config/*
 !/config/example.json
 /config_schema.json
+/tts_cache/
