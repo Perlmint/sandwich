@@ -142,15 +142,8 @@ if (config.gamify) {
         }
       }
 
-      let game = makeGameObj(gameCtr, fromRemotes);
+      let game = makeGameObj(gameCtr, fromRemotes, targetRemotes, gamify.command);
       games.push(game);
-
-      for (const [rm, cId] of fromRemotes) {
-        rm.on(EventType.message, (event) => {
-          if (event.channelId == cId && game.match(event.message, gamify.command))
-            game.doWork(targetRemotes)
-        });
-      }
     }
   }
 }
