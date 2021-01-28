@@ -109,7 +109,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
     }
   }
 
-  public async sendMessageDefault(channelName: string, message: string): Promise<void> {
+  public async sendMessageAsBot(channelName: string, message: string): Promise<void> {
     const webhook = this.webhooks.get(channelName);
     if (webhook) {
       webhook.send(message);

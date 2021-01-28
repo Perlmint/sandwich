@@ -17,12 +17,13 @@ export class GuwaaGame implements Game {
 
     this.guwaaCounterMap = new Map()
 
-    this.initRemoteCommandEventHander();
+    this.initRemoteCommandEventHandler();
 
     for (const [rm, cId] of this.messageTarget) {
       rm.on(EventType.message, (event) => {
-        if (event.channelId == cId)
+        if (event.channelId == cId) {
           this.guwaaConter(event);
+        }
       });
     }
   }
@@ -37,11 +38,11 @@ export class GuwaaGame implements Game {
     }
   }
 
-  initRemoteCommandEventHander(): void {
+  initRemoteCommandEventHandler(): void {
     // command 받는 부분 선언
     for (const [rm, cId] of this.from) {
       rm.on(EventType.message, (event) => {
-        if (event.channelId == cId && this.commandMatch(event.message, this.command)) {
+        if (event.channelId == cId && this.commandMatch(event.message)) {
           this.doWork()
           const message = this.makeMessage();
           this.sendMessageToFrom(message);
@@ -50,19 +51,19 @@ export class GuwaaGame implements Game {
     }
   }
 
-  commandMatch(message: string, command: string): boolean {
-    return command === message;
+  commandMatch(message: string): boolean {
+    return this.command === message;
   }
 
   doWork(): void {
     for (const [remote, channelId] of this.messageTarget) {
-      remote.sendMessageDefault(channelId, "test message").catch((e) => console.error(e));
+      remote.sendMessageAsBot(channelId, "test message").catch((e) => console.error(e));
     }
   }
 
   sendMessageToFrom(message: string): void {
     for (const [remote, channelId] of this.from) {
-      remote.sendMessageDefault(channelId, message).catch((e) => console.error(e));
+      remote.sendMessageAsBot(channelId, message).catch((e) => console.error(e));
     }
   }
 

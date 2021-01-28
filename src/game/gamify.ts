@@ -8,9 +8,9 @@ export interface Game {
   command: string;
 
   // init command input receiver
-  initRemoteCommandEventHander(): void;
+  initRemoteCommandEventHandler(): void;
   // message match method
-  commandMatch(message: string, command: string): boolean;
+  commandMatch(message: string): boolean;
   // do game
   doWork(): void;
   // send message to from
@@ -26,7 +26,7 @@ export function makeGameObj(g: GameConstructable, commandFrom: [Remote, string][
 }
 
 export function getGames(): Map<string, GameConstructable> {
-  let map = new Map();
+  const map = new Map();
 
   map.set(GuwaaGame.name, GuwaaGame)
 
