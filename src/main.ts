@@ -4,7 +4,7 @@ import { DiscordRemote } from './discord.js';
 import { formatName } from './name.js';
 import { EventType, Remote } from './remote.js';
 import { SlackRemote } from './slack.js';
-import { Game, makeGameObj, getGames } from './game/gamify.js';
+import { Game, getGames } from './game/gamify.js';
 
 interface TextBridge {
   nameFormat: string,
@@ -119,9 +119,9 @@ if (config.gamify) {
   const gamifyConfig = config.gamify;
   for (const gamify of gamifyConfig) {
     // config의 네임으로 gamify.ts의 game을 불러오기.
-    const gameCtr = gameMap.get(gamify.name);
+    const GameCtr = gameMap.get(gamify.name);
 
-    if (gameCtr) {
+    if (GameCtr) {
       // target 등록
       const targetRemotes: [Remote, string][] = [];
       for (const targetRemoteConfig of gamify.targets) {
@@ -142,7 +142,7 @@ if (config.gamify) {
         }
       }
 
-      const game = makeGameObj(gameCtr, fromRemotes, targetRemotes, gamify.command);
+      const game = new GameCtr(fromRemotes, targetRemotes, gamify.command);
       games.push(game);
     }
   }

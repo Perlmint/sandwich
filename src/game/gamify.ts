@@ -21,10 +21,6 @@ export interface GameConstructable {
   new(from: [Remote, string][], messageTarget: [Remote, string][], command: string): Game;
 }
 
-export function makeGameObj(g: GameConstructable, commandFrom: [Remote, string][], messageTarget: [Remote, string][], command: string) {
-  return new g(commandFrom, messageTarget, command);
-}
-
 export function getGames(): Map<string, GameConstructable> {
   const map = new Map();
 

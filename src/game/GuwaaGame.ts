@@ -3,18 +3,11 @@ import { EventType, MessageEvent, Remote } from '../remote.js';
 
 export class GuwaaGame implements Game {
   readonly name: string = "guwaa";
-  from: [Remote, string][];
-  messageTarget: [Remote, string][];
-  command: string;
 
   // 이건 이 게임에서만 사용할 parameter
   guwaaCounterMap: Map<string, [string, number]>;
 
-  public constructor(from: [Remote, string][], messageTarget: [Remote, string][], command: string) {
-    this.from = from;
-    this.messageTarget = messageTarget;
-    this.command = command;
-
+  public constructor(public from: [Remote, string][], public messageTarget: [Remote, string][], public command: string) {
     this.guwaaCounterMap = new Map()
 
     this.initRemoteCommandEventHandler();
@@ -29,7 +22,7 @@ export class GuwaaGame implements Game {
   }
 
   guwaaConter(event: MessageEvent): void {
-    let prevCounter = this.guwaaCounterMap.get(event.userId);
+    const prevCounter = this.guwaaCounterMap.get(event.userId);
     if (prevCounter) {
       prevCounter[1] = ++prevCounter[1]
       this.guwaaCounterMap.set(event.userId, prevCounter);
