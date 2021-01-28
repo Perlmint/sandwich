@@ -10,7 +10,7 @@
     "build": "babel src --out-dir lib --extensions .ts --source-maps inline",
     "test": "echo \"Error: no test specified\" && exit 1",
     "config-schema": "typescript-json-schema ./src/config_def.ts Config -o config_schema.json",
-    "lint": "eslint src/*"
+    "lint": "eslint 'src/*'"
   },
   "repository": {
     "type": "git",
