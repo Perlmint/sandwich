@@ -11,14 +11,7 @@ export class GuwaaGame implements Game {
     this.guwaaCounterMap = new Map()
 
     this.initRemoteCommandEventHandler();
-
-    for (const [rm, cId] of this.messageTarget) {
-      rm.on(EventType.message, (event) => {
-        if (event.channelId == cId) {
-          this.guwaaConter(event);
-        }
-      });
-    }
+    this.initCounterLogic();
   }
 
   guwaaConter(event: MessageEvent): void {
@@ -39,6 +32,16 @@ export class GuwaaGame implements Game {
           this.doWork()
           const message = this.makeMessage();
           this.sendMessageToFrom(message);
+        }
+      });
+    }
+  }
+
+  initCounterLogic(): void {
+    for (const [rm, cId] of this.messageTarget) {
+      rm.on(EventType.message, (event) => {
+        if (event.channelId == cId) {
+          this.guwaaConter(event);
         }
       });
     }
