@@ -17,7 +17,7 @@ export class GuwaaGame implements Game {
   guwaaConter(event: MessageEvent): void {
     const prevCounter = this.guwaaCounterMap.get(event.userId);
     if (prevCounter) {
-      prevCounter[1] = ++prevCounter[1]
+      ++prevCounter[1]
       this.guwaaCounterMap.set(event.userId, prevCounter);
     } else {
       this.guwaaCounterMap.set(event.userId, [event.userName, 1]);
