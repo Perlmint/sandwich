@@ -147,3 +147,5 @@ if (config.gamify) {
     }
   }
 }
+
+console.log('Game is ready!');

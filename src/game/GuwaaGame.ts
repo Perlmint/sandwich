@@ -15,12 +15,14 @@ export class GuwaaGame implements Game {
   }
 
   guwaaConter(event: MessageEvent): void {
-    const prevCounter = this.guwaaCounterMap.get(event.userId);
-    if (prevCounter) {
-      ++prevCounter[1]
-      console.log(this.guwaaCounterMap.get(event.userId));
-    } else {
-      this.guwaaCounterMap.set(event.userId, [event.userName, 1]);
+    if (event.message === "그어어") {
+      const prevCounter = this.guwaaCounterMap.get(event.userId);
+      if (prevCounter) {
+        ++prevCounter[1]
+        console.log(this.guwaaCounterMap.get(event.userId));
+      } else {
+        this.guwaaCounterMap.set(event.userId, [event.userName, 1]);
+      }
     }
   }
 
