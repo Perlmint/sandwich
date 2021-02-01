@@ -2,7 +2,6 @@ import { Remote } from '../remote.js';
 import { GuwaaGame } from './GuwaaGame.js'
 
 export interface Game {
-  readonly name: string;
   from: [Remote, string][];
   messageTarget: [Remote, string][];
   command: string;

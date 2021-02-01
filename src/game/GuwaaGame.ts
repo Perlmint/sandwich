@@ -2,7 +2,6 @@ import { Game } from './gamify.js'
 import { EventType, MessageEvent, Remote } from '../remote.js';
 
 export class GuwaaGame implements Game {
-  readonly name: string = "guwaa";
 
   // 이건 이 게임에서만 사용할 parameter
   guwaaCounterMap: Map<string, [string, number]>;
