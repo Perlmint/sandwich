@@ -19,7 +19,7 @@
     },
     "bridge": [
         {
-            "name_format": "<display_name>@<protocol>",
+            "nameFormat": "<display_name>@<protocol>",
             "remotes": [
                 {
                     "name": "slack",
