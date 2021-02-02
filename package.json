@@ -11,7 +11,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "config-schema": "typescript-json-schema ./src/config_def.ts Config --noExtraProps --strictNullChecks -o config_schema.json",
     "check-example-config": "node test/validate_example_config.js",
-    "lint": "eslint 'src/*' 'test/*'"
+    "lint": "eslint 'src/*' 'test/*' && editorconfig-checker"
   },
   "repository": {
     "type": "git",
@@ -33,6 +33,7 @@
     "@slack/types": "^1.10.0",
     "@typescript-eslint/eslint-plugin": "^4.13.0",
     "@typescript-eslint/parser": "^4.13.0",
+    "editorconfig-checker": "^3.3.0",
     "eslint": "^7.17.0",
     "eslint-config-standard": "^16.0.2",
     "eslint-plugin-import": "^2.22.1",
