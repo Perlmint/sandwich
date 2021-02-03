@@ -160,4 +160,14 @@ export class SlackRemote extends EventEmitter implements Remote {
       throw new Error(`${resp.error}`);
     }
   }
+
+  public async sendMessageAsBot(channel: string, message: string): Promise<void> {
+    const resp = await this.webClient.chat.postMessage({
+      channel: channel,
+      text: message
+    });
+    if (resp.error) {
+      throw new Error(`${resp.error}`);
+    }
+  }
 }

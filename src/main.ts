@@ -4,6 +4,7 @@ import { DiscordRemote } from './discord.js';
 import { formatName } from './name.js';
 import { EventType, Remote } from './remote.js';
 import { SlackRemote } from './slack.js';
+import { Game, getGames } from './game/gamify.js';
 
 interface TextBridge {
   nameFormat: string,
@@ -12,7 +13,7 @@ interface TextBridge {
 
 interface RemoteInstance {
   remote: Remote,
-  textBridges: {[channelId: string]: TextBridge},
+  textBridges: { [channelId: string]: TextBridge },
 }
 
 const remotes: Map<string, RemoteInstance> = new Map();
@@ -109,3 +110,42 @@ for (const [, remote] of remotes) {
 console.log('Bot is ready!');
 
 // TODO: stream audio channel as streaming
+
+// TODO: init gamify settings
+const gameMap = getGames();
+const games: Game[] = [];
+
+if (config.gamify) {
+  const gamifyConfig = config.gamify;
+  for (const gamify of gamifyConfig) {
+    // config의 네임으로 gamify.ts의 game을 불러오기.
+    const GameCtr = gameMap.get(gamify.name);
+
+    if (GameCtr) {
+      // target 등록
+      const targetRemotes: [Remote, string][] = [];
+      for (const targetRemoteConfig of gamify.targets) {
+        const targetRemote = remotes.get(targetRemoteConfig.name)?.remote;
+        if (targetRemote) {
+          const channelId = await targetRemote.joinTextChannel(targetRemoteConfig);
+          targetRemotes.push([targetRemote, channelId]);
+        }
+      }
+
+      // from 등록
+      const fromRemotes: [Remote, string][] = [];
+      for (const fromRemoteConfig of gamify.from) {
+        const fromRemote = remotes.get(fromRemoteConfig.name)?.remote;
+        if (fromRemote) {
+          const channelId = await fromRemote.joinTextChannel(fromRemoteConfig);
+          fromRemotes.push([fromRemote, channelId]);
+        }
+      }
+
+      const game = new GameCtr(fromRemotes, targetRemotes, gamify.command);
+      games.push(game);
+    }
+  }
+}
+
+console.log('Game is ready!');

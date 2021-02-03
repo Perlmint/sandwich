@@ -6,13 +6,13 @@ export interface UserInfo {
 }
 
 export interface MessageEvent extends UserInfo {
-    channelId: string,
-    userIcon: string,
-    message: string,
+  channelId: string,
+  userIcon: string,
+  message: string,
 }
 
 export namespace EventType {
-export const message = Symbol('Event:Message');
+  export const message = Symbol('Event:Message');
 }
 
 export interface Remote {
@@ -21,6 +21,7 @@ export interface Remote {
   joinTextChannel(channel: ChannelSpec): Promise<string>;
   joinVoiceChannel?(channel: ChannelSpec): Promise<ReadableStream>;
   sendMessage(channel: string, userName: string, userIcon: string, message: string): Promise<void>;
+  sendMessageAsBot(channel: string, message: string): Promise<void>;
 
   // event emitter
   on(eventType: typeof EventType.message, callback: (event: MessageEvent) => void): void;

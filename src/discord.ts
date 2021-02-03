@@ -108,4 +108,13 @@ export class DiscordRemote extends EventEmitter implements Remote {
       throw new Error('send message without webhook is not implementd');
     }
   }
+
+  public async sendMessageAsBot(channelName: string, message: string): Promise<void> {
+    const webhook = this.webhooks.get(channelName);
+    if (webhook) {
+      webhook.send(message);
+    } else {
+      throw new Error('send message without webhook is not implementd');
+    }
+  }
 }
