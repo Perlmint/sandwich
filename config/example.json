@@ -6,8 +6,16 @@
         },
         "discord": {
             "protocol": "discord",
-            "token": ""
+            "token": "",
+            "server": ""
         }
+    },
+    "tts": {
+        "type": "aws-polly",
+        "region": "ap-northeast-2",
+        "accessKeyId": "",
+        "secretAccessKey": "",
+        "voiceId": "Seoyeon"
     },
     "bridge": [
         {
@@ -15,21 +23,32 @@
             "remotes": [
                 {
                     "name": "slack",
-                    "channelName": "",
+                    "channelName": "project-sandwich",
                     "direction": "inout"
                 },
                 {
                     "name": "discord",
-                    "channelName": "",
+                    "channelName": "project-sandwich",
                     "direction": "inout"
                 }
             ]
         }
     ],
-    "audio_stream": [
+    "audioStream": [
         {
             "remote": "discord",
-            "channel": ""
+            "channelName": "General",
+            "enteranceAudioNotification": {
+                "format": {
+                    "join": [
+                        "<display_name>님 등장!",
+                        "<display_name> 입장"
+                    ],
+                    "leave": [
+                        "<display_name>님 나감"
+                    ]
+                }
+            }
         }
     ]
 }

@@ -1,7 +1,8 @@
-import { Client, Guild, GuildChannel, TextChannel, Webhook } from 'discord.js';
+import { Client, Guild, GuildChannel, TextChannel, VoiceChannel, Webhook } from 'discord.js';
 import EventEmitter from 'eventemitter3';
 import { ChannelSpec } from './config.js';
-import { EventType, MessageEvent, Remote } from './remote.js';
+import { ChannelJoinEvent, EventType, MessageEvent, Remote, VoiceReceiver, VoiceSender } from './remote.js';
+import { Readable } from 'stream';
 
 export class DiscordRemote extends EventEmitter implements Remote {
   private client: Client;
@@ -10,6 +11,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
   private guild!: Guild;
 
   public readonly protocol = 'discord';
+  public readonly supportMultiVoice = false;
 
   public constructor(private server: string) {
     super();
@@ -53,13 +55,30 @@ export class DiscordRemote extends EventEmitter implements Remote {
       }
     });
 
+    this.client.on('voiceStateUpdate', (oldState, newState) => {
+      if (oldState.channelID == null && newState.channelID != null) {
+        // join
+        const user = newState.member!.user;
+        this.emit(EventType.joinChannel, {
+          channelId: newState.channelID,
+          userId: user.id,
+          userName: user.username
+        } as ChannelJoinEvent);
+      } else if (oldState.channelID != null && newState.channelID == null) {
+        // leave
+        const user = oldState.member!.user;
+        this.emit(EventType.leaveChannel, {
+          channelId: oldState.channelID,
+          userId: user.id,
+          userName: user.username
+        } as ChannelJoinEvent);
+      }
+    });
+
     return new Promise<void>((resolve) => this.client.once('ready', resolve));
   }
 
-  // Discord doesn't have joining text channel.
-  // Simply verify channel & return channel id
-  // if possible, create webhook
-  public async joinTextChannel(channelSpec: ChannelSpec): Promise<string> {
+  private async resolveChannel(channelSpec: ChannelSpec): Promise<GuildChannel> {
     let channel: GuildChannel | undefined | null = null;
     if ('channelName' in channelSpec) {
       channel = this.guild.channels.cache.find(ch => ch.name === channelSpec.channelName);
@@ -67,32 +86,59 @@ export class DiscordRemote extends EventEmitter implements Remote {
       channel = await this.guild.channels.resolve(channelSpec.channelId);
     }
 
-    if (channel) {
-      if (!this.listenChannels.has(channel.id)) {
-        if (channel.type === 'text') {
-          this.listenChannels.set(channel.id, channel);
-          if (!(channel.id in this.webhooks)) {
-            const textChannel = channel as TextChannel;
-            const webhooks = await textChannel.fetchWebhooks();
-            let webhook = webhooks.find((hook) => hook.name === 'sandwich');
-            if (!webhook) {
-              webhook = await textChannel.createWebhook('sandwich');
-            }
-            this.webhooks.set(channel.id, webhook);
-          }
-        } else {
-          throw new Error(`channel ${channel.name}(${channel.id}) is not a text channel`);
-        }
-      }
-
-      return channel.id;
-    } else {
-      throw new Error(`Resolving channel ${JSON.stringify(channel)} failed`);
+    if (!channel) {
+      throw new Error(`Resolving channel ${JSON.stringify(channelSpec)} failed`);
     }
+
+    return channel;
   }
 
-  public async joinVoiceChannel(channel: ChannelSpec): Promise<ReadableStream<any>> {
-    throw new Error('Method not implemented.');
+  // Discord doesn't have joining text channel.
+  // Simply verify channel & return channel id
+  // if possible, create webhook
+  public async joinTextChannel(channelSpec: ChannelSpec): Promise<string> {
+    const channel = await this.resolveChannel(channelSpec);
+
+    if (!this.listenChannels.has(channel.id)) {
+      if (channel.type === 'text') {
+        this.listenChannels.set(channel.id, channel);
+        if (!(channel.id in this.webhooks)) {
+          const textChannel = channel as TextChannel;
+          const webhooks = await textChannel.fetchWebhooks();
+          let webhook = webhooks.find((hook) => hook.name === 'sandwich');
+          if (!webhook) {
+            webhook = await textChannel.createWebhook('sandwich');
+          }
+          this.webhooks.set(channel.id, webhook);
+        }
+      } else {
+        throw new Error(`channel ${channel.name}(${channel.id}) is not a text channel`);
+      }
+    }
+
+    return channel.id;
+  }
+
+  public async joinVoiceChannel(channelSpec: ChannelSpec): Promise<[string, VoiceReceiver, VoiceSender]> {
+    const channel = await this.resolveChannel(channelSpec);
+
+    if (channel.type !== 'voice') {
+      throw new Error(`channel ${channel.name}(${channel.id}) is not a voice channel`);
+    }
+
+    const voiceChannel = channel as VoiceChannel;
+    const connection = await voiceChannel.join();
+    console.log('join voice!');
+
+    return [
+      channel.id,
+      {},
+      {
+        async play(pathOrStream: string | Readable) {
+          connection.play(pathOrStream);
+        }
+      }
+    ];
   }
 
   public async sendMessage(channelName: string, userName: string, userIcon: string, message: string): Promise<void> {

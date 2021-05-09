@@ -45,6 +45,7 @@ export class SlackRemote extends EventEmitter implements Remote {
   private channelCache: Map<string, SlackChannel> = new Map();
 
   public readonly protocol = 'slack';
+  public readonly supportMultiVoice = false;
 
   public constructor(token: string) {
     super();

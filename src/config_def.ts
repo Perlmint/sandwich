@@ -31,10 +31,25 @@ export interface Bridge {
   remotes: BridgeRemote[],
 }
 
-export interface AudioStream {
-  name: string,
+export interface TTSAWSConfig {
+  type: 'aws-polly',
+  region: string,
+  accessKeyId: string,
+  secretAccessKey: string,
+  voiceId: string,
+}
+
+export type TTSConfig = TTSAWSConfig;
+
+export type AudioStream = ChannelSpec & {
+  name?: string,
   remote: string,
-  channel: string,
+  enteranceAudioNotification?: {
+    format: {
+      join: string[],
+      leave: string[],
+    },
+  },
 }
 
 export interface Gamify {
@@ -46,6 +61,7 @@ export interface Gamify {
 
 export interface Config {
   remote: { [name: string]: Remote },
+  tts?: TTSConfig,
   bridge?: Bridge[],
   audioStream?: AudioStream[],
   gamify?: Gamify[]
