@@ -1,15 +1,26 @@
 import { RTMClient } from '@slack/rtm-api';
-import { MessageAttachment } from '@slack/types';
+import fetch from 'node-fetch';
+import { ImageBlock, KnownBlock, MessageAttachment } from '@slack/types';
 import { ConversationsListArguments, UsersListArguments, WebAPICallResult, WebClient } from '@slack/web-api';
 import EventEmitter from 'eventemitter3';
 import { ChannelSpec } from './config_def.js';
-import { EventType, Remote, MessageEvent } from './remote.js';
+import { EventType, Remote, MessageEvent, AttachedFile } from './remote.js';
 
 /* eslint-disable camelcase */
+/* eslint-disable no-unused-vars */
+interface EventFileData {
+  title: string,
+  mimetype: string,
+  url_private: string,
+  permalink: string,
+  permalink_public: string
+};
+
 type SlackMessageEvent = MessageAttachment & {
   subtype?: 'bot_message',
   user: string,
   channel: string,
+  files?: EventFileData[],
 };
 
 interface SlackUser {
@@ -36,6 +47,16 @@ interface ChannelListResp {
   channels: SlackChannel[],
   next_cursor?: string,
 }
+
+interface SlackFileResp {
+  file: {
+    id: string,
+    permalink: string,
+    permalink_public: string
+  }
+}
+
+/* eslint-enable no-unused-vars */
 /* eslint-enable camelcase */
 
 export class SlackRemote extends EventEmitter implements Remote {
@@ -61,11 +82,23 @@ export class SlackRemote extends EventEmitter implements Remote {
         return;
       }
       const user = await this.getUser(event.user);
+      const files = (event.files ?? []).map((file) => ({
+        buffer: () => fetch(file.url_private, {
+          headers: {
+            Authorization: `Bearer ${this.webClient.token}`
+          }
+        }).then((resp) => resp.buffer()),
+        mimetype: file.mimetype,
+        name: file.title,
+        url: file.permalink_public
+      }));
+
       this.emit(EventType.message, {
         channelId: event.channel,
         message: event.text!,
         userIcon: user.profile.image_72,
-        userName: user.real_name
+        userName: user.real_name,
+        files
       } as MessageEvent);
     });
     await this.rtmClient.start();
@@ -150,13 +183,38 @@ export class SlackRemote extends EventEmitter implements Remote {
     }
   }
 
-  public async sendMessage(channel: string, userName: string, userIcon: string, message: string): Promise<void> {
+  public async sendMessage(channel: string, userName: string, userIcon: string, message: string, files: AttachedFile[]): Promise<void> {
+    const blocks: KnownBlock[] = [];
+
+    if (message.length > 0) {
+      blocks.push({
+        type: 'section',
+        text: {
+          type: 'plain_text',
+          text: message,
+          emoji: true
+        }
+      });
+    }
+
+    blocks.push(...await Promise.all((files).map(async (file) => {
+      const imageUrl = file.url;
+
+      return {
+        type: 'image',
+        alt_text: file.name,
+        image_url: imageUrl
+      } as ImageBlock;
+    })));
+
     const resp = await this.webClient.chat.postMessage({
       channel: channel,
       text: message,
       icon_url: userIcon,
-      username: userName
+      username: userName,
+      blocks: blocks
     });
+
     if (resp.error) {
       throw new Error(`${resp.error}`);
     }

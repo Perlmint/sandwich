@@ -1,7 +1,8 @@
-import { Client, Guild, GuildChannel, TextChannel, VoiceChannel, Webhook } from 'discord.js';
+import { Client, Guild, GuildChannel, MessageAttachment, TextChannel, VoiceChannel, Webhook, WebhookMessageOptions } from 'discord.js';
+import fetch from 'node-fetch';
 import EventEmitter from 'eventemitter3';
 import { ChannelSpec } from './config.js';
-import { ChannelJoinEvent, EventType, MessageEvent, Remote, VoiceReceiver, VoiceSender } from './remote.js';
+import { AttachedFile, ChannelJoinEvent, EventType, MessageEvent, Remote, VoiceReceiver, VoiceSender } from './remote.js';
 import { Readable } from 'stream';
 
 export class DiscordRemote extends EventEmitter implements Remote {
@@ -29,7 +30,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
 
     this.guild = guild;
 
-    this.client.on('message', (event) => {
+    this.client.on('message', async (event) => {
       if (!this.listenChannels.has(event.channel.id)) {
         return;
       }
@@ -40,19 +41,25 @@ export class DiscordRemote extends EventEmitter implements Remote {
         return;
       }
 
-      if (event.content.length > 0) {
-        this.emit(EventType.message, {
-          channelId: event.channel.id,
-          message: event.content,
-          userIcon: event.author.displayAvatarURL({
-            format: 'png'
-          }),
-          userId: event.author.id,
-          userName: event.author.username
-        } as MessageEvent);
-      } else {
-        // TODO: Handle text message is empty. It may have attachment.
-      }
+      const files = [...event.attachments.values()].map((attachment) => {
+        return {
+          buffer: async () => fetch(attachment.url).then((resp) => resp.buffer()),
+          mimetype: '',
+          name: attachment.name ?? '',
+          url: attachment.url
+        };
+      });
+
+      this.emit(EventType.message, {
+        channelId: event.channel.id,
+        message: event.content,
+        userIcon: event.author.displayAvatarURL({
+          format: 'png'
+        }),
+        userId: event.author.id,
+        userName: event.author.username,
+        files: files
+      } as MessageEvent);
     });
 
     this.client.on('voiceStateUpdate', (oldState, newState) => {
@@ -141,15 +148,24 @@ export class DiscordRemote extends EventEmitter implements Remote {
     ];
   }
 
-  public async sendMessage(channelName: string, userName: string, userIcon: string, message: string): Promise<void> {
+  public async sendMessage(channelName: string, userName: string, userIcon: string, message: string, files: AttachedFile[]): Promise<void> {
     const webhook = this.webhooks.get(channelName);
     if (webhook) {
-      await webhook.send(
-        message,
-        {
-          username: userName,
-          avatarURL: userIcon
-        });
+      const webhookOption: WebhookMessageOptions = {
+        username: userName,
+        avatarURL: userIcon,
+        files: await Promise.all(files.map(async (file) => new MessageAttachment(await file.buffer(), file.name)))
+      };
+      if (message.length === 0) {
+        await webhook.send(
+          webhookOption
+        );
+      } else {
+        await webhook.send(
+          message,
+          webhookOption
+        );
+      }
     } else {
       throw new Error('send message without webhook is not implementd');
     }
