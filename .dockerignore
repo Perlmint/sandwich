@@ -1,0 +1,10 @@
+.cache
+.github
+.vscode
+config
+dist
+docs
+lib
+node_modules
+test
+tts_cache
