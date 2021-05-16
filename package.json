@@ -31,6 +31,7 @@
     "@babel/plugin-transform-typescript": "^7.12.1",
     "@babel/preset-env": "^7.12.11",
     "@slack/types": "^1.10.0",
+    "@types/node-fetch": "^2.5.10",
     "@typescript-eslint/eslint-plugin": "^4.13.0",
     "@typescript-eslint/parser": "^4.13.0",
     "editorconfig-checker": "^3.3.0",
@@ -49,6 +50,7 @@
     "discord.js": "^12.5.1",
     "eventemitter3": "^3.1.2",
     "jsonschema": "^1.4.0",
+    "node-fetch": "^2.6.1",
     "source-map-support": "^0.5.19"
   }
 }

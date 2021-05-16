@@ -6,10 +6,18 @@ export interface UserInfo {
   userId: string,
 }
 
+export interface AttachedFile {
+  buffer: () => Promise<Buffer>,
+  url: string,
+  name: string,
+  mimetype: string,
+}
+
 export interface MessageEvent extends UserInfo {
   channelId: string,
   userIcon: string,
   message: string,
+  files: AttachedFile[],
 }
 
 export interface ChannelJoinEvent extends UserInfo {
@@ -36,7 +44,7 @@ export interface Remote {
   // return channel id
   joinTextChannel(channel: ChannelSpec): Promise<string>;
   joinVoiceChannel?(channel: ChannelSpec): Promise<[string, VoiceReceiver, VoiceSender]>;
-  sendMessage(channel: string, userName: string, userIcon: string, message: string): Promise<void>;
+  sendMessage(channel: string, userName: string, userIcon: string, message: string, files: AttachedFile[]): Promise<void>;
   sendMessageAsBot(channel: string, message: string): Promise<void>;
 
   // event emitter

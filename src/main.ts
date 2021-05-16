@@ -103,7 +103,7 @@ for (const [, remote] of remotes) {
     if (bridge) {
       const username = formatName(bridge.nameFormat, event, remote.remote.protocol);
       for (const [outRemote, channel] of bridge.out) {
-        outRemote.sendMessage(channel, username, event.userIcon, event.message).catch((e) => console.error(e));
+        outRemote.sendMessage(channel, username, event.userIcon, event.message, event.files).catch((e) => console.error(e));
       }
     }
   });
