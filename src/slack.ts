@@ -124,13 +124,19 @@ export class SlackRemote extends EventEmitter implements Remote {
   public async init(): Promise<void> {
     await Promise.all([this.updateUserCache(), this.updateChannelCache()]);
     this.rtmClient.on('message', async (event: SlackMessageEvent) => {
-      if (event.subtype === 'message_changed') {
-        const ev = await this.createMessageEvent(event.message, event.message.channel);
-        ev.modified = true;
+      try {
+        if (event.subtype === 'message_changed') {
+          const ev = await this.createMessageEvent(event.message, event.message.channel);
+          ev.modified = true;
 
-        this.emit(EventType.message, ev);
-      } else if (event.subtype === undefined) {
-        this.emit(EventType.message, await this.createMessageEvent(event, event.channel));
+          this.emit(EventType.message, ev);
+        } else if (event.subtype === undefined) {
+          this.emit(EventType.message, await this.createMessageEvent(event, event.channel));
+        }
+      } catch (e) {
+          console.error(e);
+          console.error(event);
+          throw e;
       }
     });
     await this.rtmClient.start();
