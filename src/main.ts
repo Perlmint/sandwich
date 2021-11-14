@@ -101,7 +101,10 @@ for (const [, remote] of remotes) {
   remote.remote.on(EventType.message, (event) => {
     const bridge = remote.textBridges[event.channelId];
     if (bridge) {
-      const username = formatName(bridge.nameFormat, event, remote.remote.protocol);
+      let username = formatName(bridge.nameFormat, event, remote.remote.protocol);
+      if (event.modified) {
+        username += '*message modified';
+      }
       for (const [outRemote, channel] of bridge.out) {
         outRemote.sendMessage(channel, username, event.userIcon, event.message, event.files).catch((e) => console.error(e));
       }

@@ -18,6 +18,7 @@ export interface MessageEvent extends UserInfo {
   userIcon: string,
   message: string,
   files: AttachedFile[],
+  modified: boolean,
 }
 
 export interface ChannelJoinEvent extends UserInfo {

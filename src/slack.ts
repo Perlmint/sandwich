@@ -16,12 +16,33 @@ interface EventFileData {
   permalink_public: string
 };
 
-type SlackMessageEvent = MessageAttachment & {
-  subtype?: 'bot_message',
+type BotMessageEvent = {
+  subtype: 'bot_message',
+};
+
+type BaseSlackMessageEvent = MessageAttachment & {
   user: string,
-  channel: string,
   files?: EventFileData[],
 };
+
+type BasicSlackMessageEvent = BaseSlackMessageEvent & {
+  subtype: undefined,
+  channel: string,
+};
+
+type SlackMessageRepliedEvent = {
+  subtype: 'message_replied',
+  message: BaseSlackMessageEvent,
+  channel: string,
+};
+
+type SlackMessageChangedEvent = {
+  subtype: 'message_changed',
+  message: BasicSlackMessageEvent,
+  previous_message: BasicSlackMessageEvent,
+};
+
+type SlackMessageEvent = BotMessageEvent | BasicSlackMessageEvent | SlackMessageRepliedEvent | SlackMessageChangedEvent;
 
 interface SlackUser {
   id: string,
@@ -75,31 +96,40 @@ export class SlackRemote extends EventEmitter implements Remote {
     this.webClient = new WebClient(token);
   }
 
+  private async createMessageEvent(event: BasicSlackMessageEvent, channel: String): Promise<MessageEvent> {
+    const user = await this.getUser(event.user);
+    const files = (event.files ?? []).map((file) => ({
+      buffer: () => fetch(file.url_private, {
+        headers: {
+          Authorization: `Bearer ${this.webClient.token}`
+        }
+      }).then((resp) => resp.buffer()),
+      mimetype: file.mimetype,
+      name: file.title,
+      url: file.permalink_public
+    }));
+
+    return {
+      channelId: channel,
+      message: event.text!,
+      userIcon: user.profile.image_72,
+      userName: user.real_name,
+      files,
+      modified: false
+    } as MessageEvent;
+  }
+
   public async init(): Promise<void> {
     await Promise.all([this.updateUserCache(), this.updateChannelCache()]);
     this.rtmClient.on('message', async (event: SlackMessageEvent) => {
-      if (event.subtype === 'bot_message') {
-        return;
-      }
-      const user = await this.getUser(event.user);
-      const files = (event.files ?? []).map((file) => ({
-        buffer: () => fetch(file.url_private, {
-          headers: {
-            Authorization: `Bearer ${this.webClient.token}`
-          }
-        }).then((resp) => resp.buffer()),
-        mimetype: file.mimetype,
-        name: file.title,
-        url: file.permalink_public
-      }));
+      if (event.subtype === 'message_changed') {
+        const ev = await this.createMessageEvent(event.message, event.message.channel);
+        ev.modified = true;
 
-      this.emit(EventType.message, {
-        channelId: event.channel,
-        message: event.text!,
-        userIcon: user.profile.image_72,
-        userName: user.real_name,
-        files
-      } as MessageEvent);
+        this.emit(EventType.message, ev);
+      } else if (event.subtype === undefined) {
+        this.emit(EventType.message, await this.createMessageEvent(event, event.channel));
+      }
     });
     await this.rtmClient.start();
   }
