@@ -20,6 +20,10 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 
 RUN npm install
+RUN apk add ffmpeg
+RUN apk add --virtual dep_dev python gcc g++ make
+RUN npm install @discordjs/opus
+RUN apk del dep_dev
 
 COPY --from=0 /usr/src/app/lib/ ./lib/
 COPY --from=0 /usr/src/app/config_schema.json ./
