@@ -112,7 +112,7 @@ export class SlackRemote extends EventEmitter implements Remote {
 
     return {
       channelId: channel,
-      message: event.text!,
+      message: event.text!.replace(/~([^~]+)~/g, '~~$1~~').replace(/<([^|]+)\|([^>]+)>/, '$1'),
       userId: user.id,
       userIcon: user.profile.image_72,
       userName: user.real_name,
@@ -222,9 +222,8 @@ export class SlackRemote extends EventEmitter implements Remote {
       blocks.push({
         type: 'section',
         text: {
-          type: 'plain_text',
+          type: 'mrkdwn',
           text: message,
-          emoji: true
         }
       });
     }

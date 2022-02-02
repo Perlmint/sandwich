@@ -52,7 +52,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
 
       this.emit(EventType.message, {
         channelId: event.channel.id,
-        message: event.content,
+        message: event.content.replace(/~~([^~]+)~~/g, '~$1~').replace(/(https?:\/\/[a-z0-9A-Z./?#=&]+)\b/g, '<$1>'),
         userId: event.author.id,
         userIcon: event.author.displayAvatarURL({
           format: 'png'
