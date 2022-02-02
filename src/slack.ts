@@ -10,6 +10,7 @@ import { EventType, Remote, MessageEvent, AttachedFile } from './remote.js';
 /* eslint-disable no-unused-vars */
 interface EventFileData {
   title: string,
+  name: string,
   mimetype: string,
   url_private: string,
   permalink: string,
@@ -105,7 +106,7 @@ export class SlackRemote extends EventEmitter implements Remote {
         }
       }).then((resp) => resp.buffer()),
       mimetype: file.mimetype,
-      name: file.title,
+      name: file.name,
       url: file.permalink_public
     }));
 
