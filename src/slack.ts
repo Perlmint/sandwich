@@ -113,6 +113,7 @@ export class SlackRemote extends EventEmitter implements Remote {
     return {
       channelId: channel,
       message: event.text!,
+      userId: user.id,
       userIcon: user.profile.image_72,
       userName: user.real_name,
       files,

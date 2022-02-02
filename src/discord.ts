@@ -53,12 +53,13 @@ export class DiscordRemote extends EventEmitter implements Remote {
       this.emit(EventType.message, {
         channelId: event.channel.id,
         message: event.content,
+        userId: event.author.id,
         userIcon: event.author.displayAvatarURL({
           format: 'png'
         }),
-        userId: event.author.id,
         userName: event.author.username,
-        files: files
+        files: files,
+        modified: false,
       } as MessageEvent);
     });
 
