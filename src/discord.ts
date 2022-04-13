@@ -1,15 +1,18 @@
-import { Client, Guild, GuildChannel, MessageAttachment, TextChannel, VoiceChannel, Webhook, WebhookMessageOptions } from 'discord.js';
+import { Client, Guild, GuildBasedChannel, GuildChannel, MessageAttachment, MessagePayload, TextChannel, VoiceChannel, Webhook, WebhookMessageOptions } from 'discord.js';
 import fetch from 'node-fetch';
 import EventEmitter from 'eventemitter3';
 import { ChannelSpec } from './config.js';
 import { AttachedFile, ChannelJoinEvent, EventType, MessageEvent, Remote, VoiceReceiver, VoiceSender } from './remote.js';
 import { Readable } from 'stream';
+import { ApplicationCommandOptionType } from 'discord-api-types';
+import { AudioPlayer, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel, VoiceConnection } from '@discordjs/voice';
 
 export class DiscordRemote extends EventEmitter implements Remote {
   private client: Client;
   private webhooks: Map<string, Webhook> = new Map();
   private listenChannels: Map<string, GuildChannel> = new Map();
   private guild!: Guild;
+  private audioPlayer: AudioPlayer;
 
   public readonly protocol = 'discord';
   public readonly supportMultiVoice = false;
@@ -17,7 +20,10 @@ export class DiscordRemote extends EventEmitter implements Remote {
   public constructor(private server: string) {
     super();
 
-    this.client = new Client();
+    this.client = new Client({
+      intents: []
+    });
+    this.audioPlayer = createAudioPlayer();
   }
 
   public async init(token: string) {
@@ -64,30 +70,48 @@ export class DiscordRemote extends EventEmitter implements Remote {
     });
 
     this.client.on('voiceStateUpdate', (oldState, newState) => {
-      if (oldState.channelID == null && newState.channelID != null) {
+      if (oldState.channelId == null && newState.channelId != null) {
         // join
         const user = newState.member!.user;
+
+        if (getVoiceConnection(newState.channelId) === undefined) {
+          const connection = joinVoiceChannel({
+            channelId: newState.channelId,
+            guildId: this.server,
+            adapterCreator: newState.guild.voiceAdapterCreator,
+          });
+          connection.subscribe(this.audioPlayer);
+        }
+
         this.emit(EventType.joinChannel, {
-          channelId: newState.channelID,
+          channelId: newState.channelId,
           userId: user.id,
           userName: user.username
         } as ChannelJoinEvent);
-      } else if (oldState.channelID != null && newState.channelID == null) {
+      } else if (oldState.channelId != null && newState.channelId == null) {
         // leave
         const user = oldState.member!.user;
+
+        if (newState.channel?.members.size == 0) {
+          const connection = getVoiceConnection(oldState.channelId);
+          if (connection !== undefined) {
+            connection.destroy();
+          }
+        }
+
         this.emit(EventType.leaveChannel, {
-          channelId: oldState.channelID,
+          channelId: oldState.channelId,
           userId: user.id,
           userName: user.username
         } as ChannelJoinEvent);
       }
     });
 
-    return new Promise<void>((resolve) => this.client.once('ready', resolve));
+    return new Promise<void>((resolve) => this.client.once('ready', () => resolve()));
   }
 
-  private async resolveChannel(channelSpec: ChannelSpec): Promise<GuildChannel> {
-    let channel: GuildChannel | undefined | null = null;
+  private async resolveChannel(channelSpec: ChannelSpec): Promise<GuildBasedChannel> {
+    let channel: GuildBasedChannel | undefined | null = null;
     if ('channelName' in channelSpec) {
       channel = this.guild.channels.cache.find(ch => ch.name === channelSpec.channelName);
     } else {
@@ -108,7 +132,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
     const channel = await this.resolveChannel(channelSpec);
 
     if (!this.listenChannels.has(channel.id)) {
-      if (channel.type === 'text') {
+      if (channel.type === 'GUILD_TEXT') {
         this.listenChannels.set(channel.id, channel);
         if (!(channel.id in this.webhooks)) {
           const textChannel = channel as TextChannel;
@@ -130,20 +154,18 @@ export class DiscordRemote extends EventEmitter implements Remote {
   public async joinVoiceChannel(channelSpec: ChannelSpec): Promise<[string, VoiceReceiver, VoiceSender]> {
     const channel = await this.resolveChannel(channelSpec);
 
-    if (channel.type !== 'voice') {
+    if (channel.type !== 'GUILD_VOICE') {
       throw new Error(`channel ${channel.name}(${channel.id}) is not a voice channel`);
     }
 
-    const voiceChannel = channel as VoiceChannel;
-    const connection = await voiceChannel.join();
-    console.log('join voice!');
+    const player = this.audioPlayer;
 
     return [
       channel.id,
       {},
       {
         async play(pathOrStream: string | Readable) {
-          connection.play(pathOrStream);
+          player.play(createAudioResource(pathOrStream));
         }
       }
     ];
@@ -157,16 +179,15 @@ export class DiscordRemote extends EventEmitter implements Remote {
         avatarURL: userIcon,
         files: await Promise.all(files.map(async (file) => new MessageAttachment(await file.buffer(), file.name)))
       };
-      if (message.length === 0) {
-        await webhook.send(
-          webhookOption
-        );
-      } else {
-        await webhook.send(
-          message,
-          webhookOption
-        );
+      const payload = new MessagePayload(webhook, webhookOption);
+      if (message.length !== 0) {
+        payload.data = {
+          content: message
+        };
       }
+        await webhook.send(
+        payload
+        );
     } else {
       throw new Error('send message without webhook is not implementd');
     }
