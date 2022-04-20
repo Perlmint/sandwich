@@ -5,6 +5,9 @@ import { ConversationsListArguments, UsersListArguments, WebAPICallResult, WebCl
 import EventEmitter from 'eventemitter3';
 import { ChannelSpec } from './config_def.js';
 import { EventType, Remote, MessageEvent, AttachedFile } from './remote.js';
+import { Message } from './message.js';
+
+import { UserMapStorage } from './storage.js';
 
 /* eslint-disable camelcase */
 /* eslint-disable no-unused-vars */
@@ -90,11 +93,50 @@ export class SlackRemote extends EventEmitter implements Remote {
   public readonly protocol = 'slack';
   public readonly supportMultiVoice = false;
 
-  public constructor(token: string) {
+  public constructor(token: string, private storage: UserMapStorage) {
     super();
 
     this.rtmClient = new RTMClient(token);
     this.webClient = new WebClient(token);
+  }
+
+  private async toInternalMessage(slack_message: BasicSlackMessageEvent): Message {
+      let len = slack_message.text?.length;
+      let idx = 0;
+      
+  }
+
+  private async toSlackMessage(msg: Message): Promise<string> {
+    let ret: string[] = [];
+
+    for (const msg_item of msg) {
+      switch (msg_item.type) {
+        case 'link':
+          if (msg_item.display) {
+            ret.push(`<${msg_item.url}|${msg_item.display}>`);
+          } else {
+            ret.push(`<${msg_item.url}>`);
+          }
+          break;
+        case 'run':
+          ret.push(msg_item.text);
+          break;
+        case 'bold':
+          ret.push(`**${this.toSlackMessage(msg_item.inner)}**`);
+          break;
+        case 'italic':
+          ret.push(`*${this.toSlackMessage(msg_item.inner)}*`);
+          break;
+        case 'strike':
+          ret.push(`~${this.toSlackMessage(msg_item.inner)}~`);
+          break;
+        case 'mention':
+          ret.push(`<@${this.storage.to_remote_id('slack', msg_item.target)}>`);
+          break;
+      }
+    }
+
+    return ret.join('');
   }
 
   private async createMessageEvent(event: BasicSlackMessageEvent, channel: String): Promise<MessageEvent> {
@@ -112,7 +154,7 @@ export class SlackRemote extends EventEmitter implements Remote {
 
     return {
       channelId: channel,
-      message: event.text!.replace(/~([^~]+)~/g, '~~$1~~').replace(/<([^|]+)\|([^>]+)>/, '$1'),
+      message: this.toInternalMessage(event),
       userId: user.id,
       userIcon: user.profile.image_72,
       userName: user.real_name,
@@ -221,7 +263,7 @@ export class SlackRemote extends EventEmitter implements Remote {
     }
   }
 
-  public async sendMessage(channel: string, userName: string, userIcon: string, message: string, files: AttachedFile[]): Promise<void> {
+  public async sendMessage(channel: string, userName: string, userIcon: string, message: Message, files: AttachedFile[]): Promise<void> {
     const blocks: KnownBlock[] = [];
 
     if (message.length > 0) {
@@ -229,7 +271,7 @@ export class SlackRemote extends EventEmitter implements Remote {
         type: 'section',
         text: {
           type: 'mrkdwn',
-          text: message,
+          text: this.toSlackMessage(message),
         }
       });
     }
@@ -246,7 +288,7 @@ export class SlackRemote extends EventEmitter implements Remote {
 
     const resp = await this.webClient.chat.postMessage({
       channel: channel,
-      text: message,
+      text: this.toSlackMessage(message),
       icon_url: userIcon,
       username: userName,
       blocks: blocks

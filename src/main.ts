@@ -102,7 +102,7 @@ for (const [, remote] of remotes) {
     try {
       const bridge = remote.textBridges[event.channelId];
       if (bridge) {
-        const username = formatName(bridge.nameFormat, event, remote.remote.protocol);
+        let username = formatName(bridge.nameFormat, event, remote.remote.protocol);
         if (event.modified) {
           username += '*message modified';
         }

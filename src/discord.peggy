@@ -1,0 +1,13 @@
+Message = MessageItem*
+Text = msg:.+ { return { type: 'run', text: msg } }
+Mention = '<@!' uid:[0-9]+ '>' { return { type: 'mention', target: options.find_user(uid) }}
+NestedItem = Link / Bold / Strike / Italic / Text
+LinkPrefix = 'http://' / 'https://'
+Link = LinkPrefix url:[^ ]+ { return { type: 'link', url: url } }
+NonStrike = Link / Bold / Italic / Text
+Strike = '~~' inner:NonStrike+ '~~' { return { type: 'strike', inner: inner }}
+NonBold = Link / Strike / Italic / Text
+Bold = '**' inner:NonBold+ '**' { return { type: 'bold', inner: inner }}
+NonItalic = Link / Strike / Bold / Text
+Italic = '*' inner:NonItalic+ '*' { return { type: 'italic', inner: inner } }
+MessageItem = Mention / NestedItem

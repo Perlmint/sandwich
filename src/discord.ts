@@ -7,6 +7,10 @@ import { Readable } from 'stream';
 import { ApplicationCommandOptionType } from 'discord-api-types';
 import { AudioPlayer, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel, VoiceConnection } from '@discordjs/voice';
 
+import { Message } from './message.js';
+import { parse as parseMsg } from './discord_msg_parser.js';
+import { UserMapStorage } from './storage.js';
+
 export class DiscordRemote extends EventEmitter implements Remote {
   private client: Client;
   private webhooks: Map<string, Webhook> = new Map();
@@ -17,13 +21,26 @@ export class DiscordRemote extends EventEmitter implements Remote {
   public readonly protocol = 'discord';
   public readonly supportMultiVoice = false;
 
-  public constructor(private server: string) {
+  public constructor(private server: string, private storage: UserMapStorage) {
     super();
 
     this.client = new Client({
       intents: []
     });
     this.audioPlayer = createAudioPlayer();
+  }
+
+  private parseMessage(message: string): Message {
+    const ret: Message = parseMsg(message, {
+      findUser(uid: string) {
+
+      },
+    });
+    return ret;
+  }
+
+  private toDiscordMessage(message: Message): string {
+    return '';
   }
 
   public async init(token: string) {
@@ -35,6 +52,17 @@ export class DiscordRemote extends EventEmitter implements Remote {
     }
 
     this.guild = guild;
+
+    this.client.application?.commands.create({
+      name: 'register',
+      description: 'User registration',
+      options: [{
+        type: ApplicationCommandOptionType.String,
+        name: 'registration key',
+        required: false,
+        description: 'registration key provided by bot',
+      }],
+    }, this.server);
 
     this.client.on('message', async (event) => {
       if (!this.listenChannels.has(event.channel.id)) {
@@ -58,7 +86,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
 
       this.emit(EventType.message, {
         channelId: event.channel.id,
-        message: event.content.replace(/~~([^~]+)~~/g, '~$1~').replace(/(https?:\/\/[a-z0-9A-Z./?#=&]+)\b/g, '<$1>'),
+        message: this.parseMessage(event.content),
         userId: event.author.id,
         userIcon: event.author.displayAvatarURL({
           format: 'png'
@@ -171,7 +199,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
     ];
   }
 
-  public async sendMessage(channelName: string, userName: string, userIcon: string, message: string, files: AttachedFile[]): Promise<void> {
+  public async sendMessage(channelName: string, userName: string, userIcon: string, message: Message, files: AttachedFile[]): Promise<void> {
     const webhook = this.webhooks.get(channelName);
     if (webhook) {
       const webhookOption: WebhookMessageOptions = {
@@ -182,12 +210,12 @@ export class DiscordRemote extends EventEmitter implements Remote {
       const payload = new MessagePayload(webhook, webhookOption);
       if (message.length !== 0) {
         payload.data = {
-          content: message
+          content: this.toDiscordMessage(message),
         };
       }
-        await webhook.send(
+      await webhook.send(
         payload
-        );
+      );
     } else {
       throw new Error('send message without webhook is not implementd');
     }
