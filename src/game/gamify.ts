@@ -1,4 +1,5 @@
 import { Remote } from '../remote.js';
+import { GoSleep } from './GoSleep.js';
 import { GuwaaGame } from './GuwaaGame.js'
 
 export interface Game {
@@ -23,7 +24,8 @@ export interface GameConstructable {
 export function getGames(): Map<string, GameConstructable> {
   const map = new Map();
 
-  map.set(GuwaaGame.name, GuwaaGame)
+  map.set(GuwaaGame.name, GuwaaGame);
+  map.set(GoSleep.name, GoSleep);
 
   return map;
 }
