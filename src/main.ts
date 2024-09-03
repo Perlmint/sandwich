@@ -39,8 +39,6 @@ for (const name of Object.keys(config.remote)) {
         remote = newRemote;
         break;
       }
-      default:
-        throw new Error(`Unknown remote protocol : ${remoteCfg!.protocol}`);
     }
 
     remotes.set(name, {
@@ -102,7 +100,7 @@ for (const [, remote] of remotes) {
     try {
       const bridge = remote.textBridges[event.channelId];
       if (bridge) {
-        const username = formatName(bridge.nameFormat, event, remote.remote.protocol);
+        let username = formatName(bridge.nameFormat, event, remote.remote.protocol);
         if (event.modified) {
           username += '*message modified';
         }
