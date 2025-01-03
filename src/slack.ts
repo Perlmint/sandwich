@@ -1,6 +1,6 @@
-import { RTMClient } from '@slack/rtm-api';
+import { SocketModeClient } from '@slack/socket-mode';
 import fetch from 'node-fetch';
-import { ImageBlock, KnownBlock, MessageAttachment } from '@slack/types';
+import { AllMessageEvents, GenericMessageEvent, ImageBlock, KnownBlock, MessageAttachment, MessageChangedEvent } from '@slack/types';
 import { ConversationsListArguments, UsersListArguments, WebAPICallResult, WebClient } from '@slack/web-api';
 import EventEmitter from 'eventemitter3';
 import { ChannelSpec } from './config_def.js';
@@ -82,7 +82,7 @@ interface SlackFileResp {
 /* eslint-enable camelcase */
 
 export class SlackRemote extends EventEmitter implements Remote {
-  private rtmClient: RTMClient;
+  private socketClient: SocketModeClient;
   private webClient: WebClient;
   private userCache: Map<string, SlackUser> = new Map();
   private channelCache: Map<string, SlackChannel> = new Map();
@@ -90,17 +90,17 @@ export class SlackRemote extends EventEmitter implements Remote {
   public readonly protocol = 'slack';
   public readonly supportMultiVoice = false;
 
-  public constructor(token: string) {
+  public constructor(socket_token: string, web_token: string) {
     super();
 
-    this.rtmClient = new RTMClient(token);
-    this.webClient = new WebClient(token);
+    this.socketClient = new SocketModeClient({ appToken: socket_token });
+    this.webClient = new WebClient(web_token);
   }
 
-  private async createMessageEvent(event: BasicSlackMessageEvent, channel: String): Promise<MessageEvent> {
+  private async createMessageEvent(event: GenericMessageEvent, channel: String): Promise<MessageEvent> {
     const user = await this.getUser(event.user);
     const files = (event.files ?? []).map((file) => ({
-      buffer: () => fetch(file.url_private, {
+      buffer: () => fetch(file.url_private!, {
         headers: {
           Authorization: `Bearer ${this.webClient.token}`
         }
@@ -123,23 +123,26 @@ export class SlackRemote extends EventEmitter implements Remote {
 
   public async init(): Promise<void> {
     await Promise.all([this.updateUserCache(), this.updateChannelCache()]);
-    this.rtmClient.on('message', async (event: SlackMessageEvent) => {
+    this.socketClient.on('message', async (ev: { ack: () => void, event: AllMessageEvents }) => {
       try {
-        if (event.subtype === 'message_changed') {
-          const ev = await this.createMessageEvent(event.message, event.message.channel);
-          ev.modified = true;
+        const event = ev.event;
+        // if (event.subtype == 'message_changed') {
+        //   const ev = await this.createMessageEvent(event, event.channel);
+        //   ev.modified = true;
 
-          this.emit(EventType.message, ev);
-        } else if (event.subtype === undefined) {
+        //   this.emit(EventType.message, ev);
+        // } else
+        if (event.subtype === undefined) {
           this.emit(EventType.message, await this.createMessageEvent(event, event.channel));
         }
+        ev.ack();
       } catch (e) {
           console.error(e);
           console.error(event);
           throw e;
       }
     });
-    await this.rtmClient.start();
+    await this.socketClient.start();
   }
 
   private async getUser(userID: string): Promise<SlackUser> {

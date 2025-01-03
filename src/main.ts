@@ -34,7 +34,7 @@ for (const name of Object.keys(config.remote)) {
         break;
       }
       case 'slack': {
-        const newRemote = new SlackRemote(remoteCfg.token);
+        const newRemote = new SlackRemote(remoteCfg.socket_token, remoteCfg.web_token);
         await newRemote.init();
         remote = newRemote;
         break;

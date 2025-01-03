@@ -1,6 +1,7 @@
 export interface SlackRemote {
   protocol: 'slack',
-  token: string,
+  web_token: string,
+  socket_token: string,
 }
 
 export interface DiscordRemote {
