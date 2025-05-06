@@ -31,6 +31,9 @@ import {
   VoiceSender,
 } from "./remote.js";
 import { Readable } from "stream";
+import BiMap from "bidirectional-map";
+
+const mentionPattern = /<@([A-Z0-9]+)>/g;
 
 export class DiscordRemote extends EventEmitter implements Remote {
   private client: Client;
@@ -41,7 +44,10 @@ export class DiscordRemote extends EventEmitter implements Remote {
   public readonly protocol = "discord";
   public readonly supportMultiVoice = false;
 
-  public constructor(private server: string) {
+  public constructor(
+    private server: string,
+    private userMap: BiMap<string>,
+  ) {
     super();
 
     this.client = new Client({
@@ -90,7 +96,15 @@ export class DiscordRemote extends EventEmitter implements Remote {
         channelId: event.channel.id,
         message: event.content
           .replace(/~~([^~]+)~~/g, "~$1~")
-          .replace(/(https?:\/\/[a-z0-9A-Z./?#=&]+)\b/g, "<$1>"),
+          .replace(/(https?:\/\/[a-z0-9A-Z./?#=&]+)\b/g, "<$1>")
+          .replace(mentionPattern, (_, id) => {
+            let internalId = this.userMap.get(id);
+            if (internalId == null) {
+              console.log(`unknown id - discord recv  ${id}`);
+              internalId = "unknown";
+            }
+            return `<@${internalId}>`;
+          }),
         userId: event.author.id,
         userIcon: event.author.displayAvatarURL({
           extension: "png",
@@ -122,17 +136,17 @@ export class DiscordRemote extends EventEmitter implements Remote {
     });
 
     return new Promise<void>((resolve) =>
-      this.client.once(Events.ClientReady, (_) => resolve())
+      this.client.once(Events.ClientReady, (_) => resolve()),
     );
   }
 
   private async resolveChannel(
-    channelSpec: ChannelSpec
+    channelSpec: ChannelSpec,
   ): Promise<GuildBasedChannel> {
     let channel: GuildBasedChannel | undefined | null = null;
     if ("channelName" in channelSpec) {
       channel = this.guild.channels.cache.find(
-        (ch) => ch.name === channelSpec.channelName
+        (ch) => ch.name === channelSpec.channelName,
       );
     } else {
       channel = await this.guild.channels.resolve(channelSpec.channelId);
@@ -140,7 +154,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
 
     if (!channel) {
       throw new Error(
-        `Resolving channel ${JSON.stringify(channelSpec)} failed`
+        `Resolving channel ${JSON.stringify(channelSpec)} failed`,
       );
     }
 
@@ -169,7 +183,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
         }
       } else {
         throw new Error(
-          `channel ${channel.name}(${channel.id}) is not a text channel`
+          `channel ${channel.name}(${channel.id}) is not a text channel`,
         );
       }
     }
@@ -178,13 +192,13 @@ export class DiscordRemote extends EventEmitter implements Remote {
   }
 
   public async joinVoiceChannel(
-    channelSpec: ChannelSpec
+    channelSpec: ChannelSpec,
   ): Promise<[string, VoiceReceiver, VoiceSender]> {
     const channel = await this.resolveChannel(channelSpec);
 
     if (channel.type !== ChannelType.GuildVoice) {
       throw new Error(
-        `channel ${channel.name}(${channel.id}) is not a voice channel`
+        `channel ${channel.name}(${channel.id}) is not a voice channel`,
       );
     }
 
@@ -215,12 +229,19 @@ export class DiscordRemote extends EventEmitter implements Remote {
     userName: string,
     userIcon: string,
     message: string,
-    files: AttachedFile[]
+    files: AttachedFile[],
   ): Promise<void> {
     const webhook = this.webhooks.get(channelName);
     if (webhook) {
       const webhookOption: WebhookMessageCreateOptions = {
-        content: message,
+        content: message.replace(mentionPattern, (_, id) => {
+          let discordId = this.userMap.getKey(id);
+          if (discordId == null) {
+            console.log(`unknown id - send discord ${id}`);
+            discordId = "unknown";
+          }
+          return `<@${discordId}>`;
+        }),
         username: userName,
         avatarURL: userIcon,
         files: await Promise.all(
@@ -228,8 +249,8 @@ export class DiscordRemote extends EventEmitter implements Remote {
             async (file) =>
               new AttachmentBuilder(await file.buffer(), {
                 name: file.name,
-              })
-          )
+              }),
+          ),
         ),
       };
       await webhook.send(webhookOption);
@@ -240,7 +261,7 @@ export class DiscordRemote extends EventEmitter implements Remote {
 
   public async sendMessageAsBot(
     channelName: string,
-    message: string
+    message: string,
   ): Promise<void> {
     const webhook = this.webhooks.get(channelName);
     if (webhook) {

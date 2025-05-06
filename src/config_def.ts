@@ -62,6 +62,7 @@ export interface Gamify {
 
 export interface Config {
   remote: { [name: string]: Remote },
+  userMap?: { [remote:string]:string }[],
   tts?: TTSConfig,
   bridge?: Bridge[],
   audioStream?: AudioStream[],

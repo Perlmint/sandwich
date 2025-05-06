@@ -1,24 +1,39 @@
-import 'source-map-support';
-import config from './config.js';
-import { DiscordRemote } from './discord.js';
-import { formatName } from './name.js';
-import { EventType, Remote } from './remote.js';
-import { SlackRemote } from './slack.js';
-import { Game, getGames } from './game/gamify.js';
-import initTTS from './tts.js';
-import { sample } from './utils.js';
+import "source-map-support";
+import config from "./config.js";
+import { DiscordRemote } from "./discord.js";
+import { formatName } from "./name.js";
+import { EventType, Remote } from "./remote.js";
+import { SlackRemote } from "./slack.js";
+import { Game, getGames } from "./game/gamify.js";
+import initTTS from "./tts.js";
+import { sample } from "./utils.js";
+import BiMap from "bidirectional-map";
 
 interface TextBridge {
-  nameFormat: string,
-  out: [Remote, string][],
+  nameFormat: string;
+  out: [Remote, string][];
 }
 
 interface RemoteInstance {
-  remote: Remote,
-  textBridges: { [channelId: string]: TextBridge },
+  remote: Remote;
+  textBridges: { [channelId: string]: TextBridge };
 }
 
 const remotes: Map<string, RemoteInstance> = new Map();
+
+const userMap: { [remote: string]: BiMap<string> } = {};
+if (config.userMap) {
+  let id = 1;
+  for (const userMapItem of config.userMap) {
+    for (const remote of Object.keys(userMapItem)) {
+      if (userMap[remote] == null) {
+        userMap[remote] = new BiMap();
+      }
+      userMap[remote].set(userMapItem[remote], `${id}`);
+    }
+    id++;
+  }
+}
 
 // init remotes
 for (const name of Object.keys(config.remote)) {
@@ -27,14 +42,18 @@ for (const name of Object.keys(config.remote)) {
   try {
     let remote: Remote;
     switch (remoteCfg.protocol) {
-      case 'discord': {
-        const newRemote = new DiscordRemote(remoteCfg.server);
+      case "discord": {
+        const newRemote = new DiscordRemote(remoteCfg.server, userMap[name]);
         await newRemote.init(remoteCfg.token);
         remote = newRemote;
         break;
       }
-      case 'slack': {
-        const newRemote = new SlackRemote(remoteCfg.socket_token, remoteCfg.web_token);
+      case "slack": {
+        const newRemote = new SlackRemote(
+          remoteCfg.socket_token,
+          remoteCfg.web_token,
+          userMap[name],
+        );
         await newRemote.init();
         remote = newRemote;
         break;
@@ -43,7 +62,7 @@ for (const name of Object.keys(config.remote)) {
 
     remotes.set(name, {
       remote,
-      textBridges: {}
+      textBridges: {},
     });
   } catch (e) {
     console.error(e);
@@ -55,13 +74,13 @@ if (config.bridge) {
   for (const bridgeCfg of config.bridge) {
     for (let inIdx = 0, len = bridgeCfg.remotes.length; inIdx < len; inIdx++) {
       const inRemoteCfg = bridgeCfg.remotes[inIdx];
-      if (inRemoteCfg.direction === 'out') {
+      if (inRemoteCfg.direction === "out") {
         continue;
       }
 
       const bridge: TextBridge = {
         nameFormat: bridgeCfg.nameFormat,
-        out: []
+        out: [],
       };
 
       const inRemote = remotes.get(inRemoteCfg.name);
@@ -79,7 +98,7 @@ if (config.bridge) {
         }
 
         const outRemoteCfg = bridgeCfg.remotes[outIdx];
-        if (outRemoteCfg.direction === 'in') {
+        if (outRemoteCfg.direction === "in") {
           continue;
         }
 
@@ -88,7 +107,8 @@ if (config.bridge) {
           // TODO: log invalid out error
           continue;
         }
-        const outChannelId = await outRemote.remote.joinTextChannel(outRemoteCfg);
+        const outChannelId =
+          await outRemote.remote.joinTextChannel(outRemoteCfg);
         bridge.out.push([outRemote.remote, outChannelId]);
       }
     }
@@ -100,13 +120,25 @@ for (const [, remote] of remotes) {
     try {
       const bridge = remote.textBridges[event.channelId];
       if (bridge) {
-        let username = formatName(bridge.nameFormat, event, remote.remote.protocol);
+        let username = formatName(
+          bridge.nameFormat,
+          event,
+          remote.remote.protocol,
+        );
         if (event.modified) {
-          username += '*message modified';
+          username += "*message modified";
         }
 
         for (const [outRemote, channel] of bridge.out) {
-          outRemote.sendMessage(channel, username, event.userIcon, event.message, event.files).catch((e) => console.error(e));
+          outRemote
+            .sendMessage(
+              channel,
+              username,
+              event.userIcon,
+              event.message,
+              event.files,
+            )
+            .catch((e) => console.error(e));
         }
       }
     } catch (e) {
@@ -124,7 +156,9 @@ if (config.audioStream) {
     const remoteInst = remotes.get(stream.remote);
 
     if (remoteInst == null) {
-      console.error(`Invalid remote name is used for audioStream - ${stream.remote}`);
+      console.error(
+        `Invalid remote name is used for audioStream - ${stream.remote}`,
+      );
       continue;
     }
 
@@ -134,7 +168,9 @@ if (config.audioStream) {
     refCount++;
     if (refCount > 1) {
       if (!remote.supportMultiVoice) {
-        console.error(`Remote ${stream.remote} is referenced multiple times for audioStream. But It doesn't support multiple voice`);
+        console.error(
+          `Remote ${stream.remote} is referenced multiple times for audioStream. But It doesn't support multiple voice`,
+        );
         continue;
       }
     }
@@ -144,7 +180,7 @@ if (config.audioStream) {
       continue;
     }
 
-    const [channelId,, sender] = await remote.joinVoiceChannel(stream);
+    const [channelId, , sender] = await remote.joinVoiceChannel(stream);
 
     if (stream.enteranceAudioNotification) {
       const format = stream.enteranceAudioNotification.format;
@@ -153,20 +189,28 @@ if (config.audioStream) {
           return;
         }
 
-        sender.play(await TTS!(formatName(sample(format.join)!, channelJoin, remote.protocol)));
+        sender.play(
+          await TTS!(
+            formatName(sample(format.join)!, channelJoin, remote.protocol),
+          ),
+        );
       });
       remote.on(EventType.leaveChannel, async (channelJoin) => {
         if (channelJoin.channelId !== channelId) {
           return;
         }
 
-        sender.play(await TTS!(formatName(sample(format.leave)!, channelJoin, remote.protocol)));
+        sender.play(
+          await TTS!(
+            formatName(sample(format.leave)!, channelJoin, remote.protocol),
+          ),
+        );
       });
     }
   }
 }
 
-console.log('Bot is ready!');
+console.log("Bot is ready!");
 
 // TODO: init gamify settings
 const gameMap = getGames();
@@ -184,7 +228,8 @@ if (config.gamify) {
       for (const targetRemoteConfig of gamify.targets) {
         const targetRemote = remotes.get(targetRemoteConfig.name)?.remote;
         if (targetRemote) {
-          const channelId = await targetRemote.joinTextChannel(targetRemoteConfig);
+          const channelId =
+            await targetRemote.joinTextChannel(targetRemoteConfig);
           targetRemotes.push([targetRemote, channelId]);
         }
       }
@@ -205,4 +250,4 @@ if (config.gamify) {
   }
 }
 
-console.log('Game is ready!');
+console.log("Game is ready!");
