@@ -2,6 +2,7 @@ import { SocketModeClient } from "@slack/socket-mode";
 import fetch from "node-fetch";
 import {
   AllMessageEvents,
+  FileShareMessageEvent,
   GenericMessageEvent,
   ImageBlock,
   KnownBlock,
@@ -123,7 +124,7 @@ export class SlackRemote extends EventEmitter implements Remote {
   }
 
   private async createMessageEvent(
-    event: GenericMessageEvent,
+    event: GenericMessageEvent | FileShareMessageEvent,
     channel: String,
   ): Promise<MessageEvent> {
     const user = await this.getUser(event.user);
@@ -173,16 +174,19 @@ export class SlackRemote extends EventEmitter implements Remote {
 
           //   this.emit(EventType.message, ev);
           // } else
-          if (event.subtype === undefined) {
+          if (event.subtype === undefined || event.subtype === "file_share") {
             this.emit(
               EventType.message,
               await this.createMessageEvent(event, event.channel),
             );
+          } else {
+            console.warn(`Unknown event subtype - ${event.subtype}`);
+            console.warn(event);
           }
           ev.ack();
         } catch (e) {
           console.error(e);
-          console.error(event);
+          console.error(ev);
           throw e;
         }
       },
