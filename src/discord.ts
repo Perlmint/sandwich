@@ -233,15 +233,16 @@ export class DiscordRemote extends EventEmitter implements Remote {
   ): Promise<void> {
     const webhook = this.webhooks.get(channelName);
     if (webhook) {
-      const webhookOption: WebhookMessageCreateOptions = {
-        content: message.replace(mentionPattern, (_, id) => {
+      const content = message.replace(mentionPattern, (_, id) => {
           let discordId = this.userMap.getKey(id);
           if (discordId == null) {
             console.log(`unknown id - send discord ${id}`);
             discordId = "unknown";
           }
           return `<@${discordId}>`;
-        }),
+      });
+      const webhookOption: WebhookMessageCreateOptions = {
+        content: content !== "" ? content : undefined,
         username: userName,
         avatarURL: userIcon,
         files: await Promise.all(
