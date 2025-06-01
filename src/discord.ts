@@ -253,7 +253,12 @@ export class DiscordRemote extends EventEmitter implements Remote {
           ),
         ),
       };
+      try {
       await webhook.send(webhookOption);
+      } catch (e) {
+        console.error("Failed to send message to discord via webhook", e);
+        throw e;
+      }
     } else {
       throw new Error("send message without webhook is not implemented");
     }
