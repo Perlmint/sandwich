@@ -7,7 +7,7 @@ import {
   ImageBlock,
   KnownBlock,
   MessageAttachment,
-  MessageChangedEvent,
+  ThreadBroadcastMessageEvent,
 } from "@slack/types";
 import {
   ConversationsListArguments,
@@ -124,7 +124,7 @@ export class SlackRemote extends EventEmitter implements Remote {
   }
 
   private async createMessageEvent(
-    event: GenericMessageEvent | FileShareMessageEvent,
+    event: GenericMessageEvent | FileShareMessageEvent | (ThreadBroadcastMessageEvent & Pick<GenericMessageEvent, 'files'>),
     channel: String,
   ): Promise<MessageEvent> {
     const user = await this.getUser(event.user);
@@ -174,11 +174,13 @@ export class SlackRemote extends EventEmitter implements Remote {
 
           //   this.emit(EventType.message, ev);
           // } else
-          if (event.subtype === undefined || event.subtype === "file_share") {
+          if (event.subtype === undefined || event.subtype === "file_share" || event.subtype === "thread_broadcast") {
             this.emit(
               EventType.message,
               await this.createMessageEvent(event, event.channel),
             );
+          } else if (event.subtype === 'bot_message') {
+            // ignore bot message
           } else {
             console.warn(`Unknown event subtype - ${event.subtype}`);
             console.warn(event);
