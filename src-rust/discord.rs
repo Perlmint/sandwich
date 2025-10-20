@@ -30,9 +30,40 @@ impl EventHandler for Handler {
         tracing::info!("Discord bot connected as {}", ready.user.name);
     }
 
-    async fn message(&self, _ctx: Context, msg: Message) {
+    async fn message(&self, ctx: Context, msg: Message) {
+        // Detect if this is a thread message
+        let is_thread = matches!(
+            msg.kind,
+            serenity::all::MessageType::ThreadStarterMessage | serenity::all::MessageType::Regular
+        ) && msg.channel(&ctx).await.ok().map(|ch| {
+            if let serenity::all::Channel::Guild(guild_ch) = ch {
+                matches!(
+                    guild_ch.kind,
+                    serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread
+                )
+            } else {
+                false
+            }
+        }).unwrap_or(false);
+
+        // For thread messages, the channel_id is the thread ID
+        let (actual_channel_id, thread_id, parent_message_id) = if is_thread {
+            // Get parent channel from the thread
+            if let Ok(serenity::all::Channel::Guild(thread_channel)) = msg.channel(&ctx).await {
+                if let Some(parent_id) = thread_channel.parent_id {
+                    (parent_id.to_string(), Some(msg.channel_id.to_string()), None)
+                } else {
+                    (msg.channel_id.to_string(), None, None)
+                }
+            } else {
+                (msg.channel_id.to_string(), None, None)
+            }
+        } else {
+            (msg.channel_id.to_string(), None, None)
+        };
+
         // Ignore messages not in listen channels
-        if !self.listen_channels.contains_key(&msg.channel_id.to_string()) {
+        if !self.listen_channels.contains_key(&actual_channel_id) {
             return;
         }
 
@@ -56,7 +87,7 @@ impl EventHandler for Handler {
         let message = self.transform_discord_to_internal(&msg.content);
 
         let event = MessageEvent {
-            channel_id: msg.channel_id.to_string(),
+            channel_id: actual_channel_id,
             message_id: Some(msg.id.to_string()),
             user_name: msg.author.name.clone(),
             user_id: msg.author.id.to_string(),
@@ -64,6 +95,8 @@ impl EventHandler for Handler {
             message,
             files,
             modified: msg.edited_timestamp.is_some(),
+            thread_id,
+            parent_message_id,
         };
 
         let _ = self.event_tx.send(Event::Message(event));
@@ -71,13 +104,42 @@ impl EventHandler for Handler {
 
     async fn message_update(
         &self,
-        _ctx: Context,
+        ctx: Context,
         _old: Option<Message>,
         _new: Option<Message>,
         event: serenity::model::event::MessageUpdateEvent,
     ) {
+        // Detect if this is a thread message
+        let is_thread = if let Ok(channel) = event.channel_id.to_channel(&ctx).await {
+            if let serenity::all::Channel::Guild(guild_ch) = channel {
+                matches!(
+                    guild_ch.kind,
+                    serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread
+                )
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        // For thread messages, get the parent channel
+        let (actual_channel_id, thread_id) = if is_thread {
+            if let Ok(serenity::all::Channel::Guild(thread_channel)) = event.channel_id.to_channel(&ctx).await {
+                if let Some(parent_id) = thread_channel.parent_id {
+                    (parent_id.to_string(), Some(event.channel_id.to_string()))
+                } else {
+                    (event.channel_id.to_string(), None)
+                }
+            } else {
+                (event.channel_id.to_string(), None)
+            }
+        } else {
+            (event.channel_id.to_string(), None)
+        };
+
         // Ignore messages not in listen channels
-        if !self.listen_channels.contains_key(&event.channel_id.to_string()) {
+        if !self.listen_channels.contains_key(&actual_channel_id) {
             return;
         }
 
@@ -98,7 +160,7 @@ impl EventHandler for Handler {
         let message = self.transform_discord_to_internal(&content);
 
         let event = MessageEvent {
-            channel_id: event.channel_id.to_string(),
+            channel_id: actual_channel_id,
             message_id: Some(event.id.to_string()),
             user_name,
             user_id,
@@ -106,6 +168,8 @@ impl EventHandler for Handler {
             message,
             files: vec![], // Edits typically don't include new files
             modified: true,
+            thread_id,
+            parent_message_id: None,
         };
 
         let _ = self.event_tx.send(Event::Message(event));
@@ -322,12 +386,8 @@ impl Remote for DiscordRemote {
         user_icon: &str,
         message: &str,
         files: &[AttachedFile],
+        thread_id: Option<&str>,
     ) -> Result<String> {
-        let webhook = self
-            .webhooks
-            .get(channel)
-            .context("Webhook not found for channel")?;
-
         let transformed_message = self.transform_internal_to_discord(message);
 
         // Download files if needed
@@ -343,24 +403,51 @@ impl Remote for DiscordRemote {
             }
         }
 
-        let mut execute_webhook = serenity::builder::ExecuteWebhook::new()
-            .username(user_name)
-            .avatar_url(user_icon);
+        // If thread_id is provided, send to the thread directly
+        if let Some(thread_id_str) = thread_id {
+            let thread_channel_id: ChannelId = thread_id_str.parse::<u64>()?.into();
 
-        if !transformed_message.is_empty() {
-            execute_webhook = execute_webhook.content(transformed_message);
+            let mut create_message = serenity::builder::CreateMessage::new();
+
+            if !transformed_message.is_empty() {
+                create_message = create_message.content(transformed_message);
+            }
+
+            if !attachments.is_empty() {
+                create_message = create_message.files(attachments);
+            }
+
+            let sent_message = thread_channel_id
+                .send_message(&self.client.http, create_message)
+                .await?;
+
+            Ok(sent_message.id.to_string())
+        } else {
+            // Use webhook for regular channel messages
+            let webhook = self
+                .webhooks
+                .get(channel)
+                .context("Webhook not found for channel")?;
+
+            let mut execute_webhook = serenity::builder::ExecuteWebhook::new()
+                .username(user_name)
+                .avatar_url(user_icon);
+
+            if !transformed_message.is_empty() {
+                execute_webhook = execute_webhook.content(transformed_message);
+            }
+
+            if !attachments.is_empty() {
+                execute_webhook = execute_webhook.files(attachments);
+            }
+
+            let sent_message = webhook
+                .execute(&self.client.http, true, execute_webhook) // wait=true to get message ID
+                .await?
+                .context("Failed to get message from webhook execution")?;
+
+            Ok(sent_message.id.to_string())
         }
-
-        if !attachments.is_empty() {
-            execute_webhook = execute_webhook.files(attachments);
-        }
-
-        let sent_message = webhook
-            .execute(&self.client.http, true, execute_webhook) // wait=true to get message ID
-            .await?
-            .context("Failed to get message from webhook execution")?;
-
-        Ok(sent_message.id.to_string())
     }
 
     async fn edit_message(
@@ -369,8 +456,15 @@ impl Remote for DiscordRemote {
         message_id: &str,
         message: &str,
         _files: &[AttachedFile],
+        thread_id: Option<&str>,
     ) -> Result<()> {
-        let channel_id: ChannelId = channel.parse::<u64>()?.into();
+        // Use thread_id if provided, otherwise use channel
+        let channel_id: ChannelId = if let Some(thread_id_str) = thread_id {
+            thread_id_str.parse::<u64>()?.into()
+        } else {
+            channel.parse::<u64>()?.into()
+        };
+
         let msg_id: serenity::model::id::MessageId = message_id.parse::<u64>()?.into();
 
         let transformed_message = self.transform_internal_to_discord(message);
@@ -387,6 +481,39 @@ impl Remote for DiscordRemote {
             .await?;
 
         Ok(())
+    }
+
+    async fn create_thread(
+        &self,
+        channel: &str,
+        message_id: Option<&str>,
+        name: &str,
+    ) -> Result<String> {
+        let channel_id: ChannelId = channel.parse::<u64>()?.into();
+
+        if let Some(msg_id_str) = message_id {
+            // Create thread from a message
+            let msg_id: serenity::model::id::MessageId = msg_id_str.parse::<u64>()?.into();
+
+            let create_thread = serenity::builder::CreateThread::new(name.to_string())
+                .auto_archive_duration(serenity::all::AutoArchiveDuration::OneDay);
+
+            let thread = channel_id
+                .create_thread_from_message(&self.client.http, msg_id, create_thread)
+                .await?;
+
+            Ok(thread.id.to_string())
+        } else {
+            // Create thread without a message (orphan thread)
+            let create_thread = serenity::builder::CreateThread::new(name.to_string())
+                .auto_archive_duration(serenity::all::AutoArchiveDuration::OneDay);
+
+            let thread = channel_id
+                .create_thread(&self.client.http, create_thread)
+                .await?;
+
+            Ok(thread.id.to_string())
+        }
     }
 
     async fn send_message_as_bot(&self, channel: &str, message: &str) -> Result<()> {

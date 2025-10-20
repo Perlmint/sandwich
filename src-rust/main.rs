@@ -18,6 +18,7 @@ use crate::config::{BridgeDirection, Config, RemoteConfig};
 use crate::name::format_name;
 use crate::remote::{Event, Remote, UserInfo};
 use crate::user_map::UserMap;
+use crate::utils::truncate_thread_name;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -204,6 +205,7 @@ async fn main() -> Result<()> {
                                                                 &dest_msg_id,
                                                                 &msg_event.message,
                                                                 &msg_event.files,
+                                                                msg_event.thread_id.as_deref(),
                                                             ).await {
                                                                 error!("Failed to edit message on {}: {}", dest_remote_name, e);
                                                             }
@@ -222,6 +224,94 @@ async fn main() -> Result<()> {
 
                                     // Forward to all output remotes
                                     for (out_remote_name, (out_remote, out_channel_id)) in &out_remotes {
+                                        // Determine thread_id for destination
+                                        let dest_thread_id = if let (Some(db), Some(ref thread_id)) = (&db_clone, &msg_event.thread_id) {
+                                            // Message is in a thread
+                                            if let Some(ref parent_id) = msg_event.parent_message_id {
+                                                // This is a reply in a thread - look up or create thread mapping
+                                                match db.lookup_thread_mapping(
+                                                    &in_remote_name,
+                                                    &in_channel_id_clone,
+                                                    thread_id,
+                                                    out_remote_name,
+                                                ).await {
+                                                    Ok(Some((_, dest_thread_id))) => {
+                                                        // Thread already mapped
+                                                        Some(dest_thread_id)
+                                                    }
+                                                    Ok(None) => {
+                                                        // Thread not mapped - need to create it
+                                                        // Look up parent message to get thread name
+                                                        let thread_name = if let Ok(destinations) = db.lookup_destinations(
+                                                            &in_remote_name,
+                                                            &in_channel_id_clone,
+                                                            parent_id,
+                                                        ).await {
+                                                            if let Some((_, _, parent_msg_id)) = destinations.iter()
+                                                                .find(|(dest_remote, _, _)| dest_remote == out_remote_name) {
+                                                                // Parent message found, create thread from it
+                                                                if let Ok(new_thread_id) = out_remote.create_thread(
+                                                                    out_channel_id,
+                                                                    Some(parent_msg_id),
+                                                                    &truncate_thread_name(&msg_event.message),
+                                                                ).await {
+                                                                    // Store thread mapping
+                                                                    if let Err(e) = db.insert_thread_mapping(
+                                                                        &in_remote_name,
+                                                                        &in_channel_id_clone,
+                                                                        thread_id,
+                                                                        out_remote_name,
+                                                                        out_channel_id,
+                                                                        &new_thread_id,
+                                                                    ).await {
+                                                                        error!("Failed to store thread mapping: {}", e);
+                                                                    }
+                                                                    Some(new_thread_id)
+                                                                } else {
+                                                                    None
+                                                                }
+                                                            } else {
+                                                                // Parent not found - create orphan thread
+                                                                if let Ok(new_thread_id) = out_remote.create_thread(
+                                                                    out_channel_id,
+                                                                    None,
+                                                                    &truncate_thread_name(&msg_event.message),
+                                                                ).await {
+                                                                    if let Err(e) = db.insert_thread_mapping(
+                                                                        &in_remote_name,
+                                                                        &in_channel_id_clone,
+                                                                        thread_id,
+                                                                        out_remote_name,
+                                                                        out_channel_id,
+                                                                        &new_thread_id,
+                                                                    ).await {
+                                                                        error!("Failed to store thread mapping: {}", e);
+                                                                    }
+                                                                    Some(new_thread_id)
+                                                                } else {
+                                                                    None
+                                                                }
+                                                            }
+                                                        } else {
+                                                            None
+                                                        };
+                                                        thread_name
+                                                    }
+                                                    Err(e) => {
+                                                        error!("Failed to lookup thread mapping: {}", e);
+                                                        None
+                                                    }
+                                                }
+                                            } else {
+                                                // This is a thread parent message - just send it normally
+                                                // Thread will be created when first reply comes in
+                                                None
+                                            }
+                                        } else {
+                                            // Not a threaded message
+                                            None
+                                        };
+
                                         match out_remote
                                             .send_message(
                                                 out_channel_id,
@@ -229,11 +319,12 @@ async fn main() -> Result<()> {
                                                 &msg_event.user_icon,
                                                 &msg_event.message,
                                                 &msg_event.files,
+                                                dest_thread_id.as_deref(),
                                             )
                                             .await
                                         {
                                             Ok(dest_msg_id) => {
-                                                // Store mapping in database if available
+                                                // Store message mapping in database if available
                                                 if let (Some(db), Some(source_msg_id)) = (&db_clone, &msg_event.message_id) {
                                                     if let Err(e) = db.insert_mapping(
                                                         &in_remote_name,
@@ -244,6 +335,30 @@ async fn main() -> Result<()> {
                                                         &dest_msg_id,
                                                     ).await {
                                                         error!("Failed to store message mapping: {}", e);
+                                                    }
+                                                }
+
+                                                // If this is the first message in a thread (from Discord orphan thread),
+                                                // create thread mapping using the sent message as parent
+                                                if let (Some(db), Some(ref thread_id), None) = (&db_clone, &msg_event.thread_id, &msg_event.parent_message_id) {
+                                                    // Check if thread mapping doesn't exist yet
+                                                    if let Ok(None) = db.lookup_thread_mapping(
+                                                        &in_remote_name,
+                                                        &in_channel_id_clone,
+                                                        thread_id,
+                                                        out_remote_name,
+                                                    ).await {
+                                                        // This is first message in thread - use dest_msg_id as thread_ts
+                                                        if let Err(e) = db.insert_thread_mapping(
+                                                            &in_remote_name,
+                                                            &in_channel_id_clone,
+                                                            thread_id,
+                                                            out_remote_name,
+                                                            out_channel_id,
+                                                            &dest_msg_id,
+                                                        ).await {
+                                                            error!("Failed to store thread mapping for orphan thread: {}", e);
+                                                        }
                                                     }
                                                 }
                                             }

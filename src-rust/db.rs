@@ -61,6 +61,36 @@ impl MessageMappingDb {
         .await
         .context("Failed to create idx_created_at index")?;
 
+        // Create thread_mappings table
+        sqlx::query(
+            r#"
+            CREATE TABLE IF NOT EXISTS thread_mappings (
+                source_remote TEXT NOT NULL,
+                source_channel TEXT NOT NULL,
+                source_thread_id TEXT NOT NULL,
+                dest_remote TEXT NOT NULL,
+                dest_channel TEXT NOT NULL,
+                dest_thread_id TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                PRIMARY KEY (source_remote, source_channel, source_thread_id, dest_remote)
+            )
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .context("Failed to create thread_mappings table")?;
+
+        // Create index for reverse thread lookup
+        sqlx::query(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_thread_dest
+            ON thread_mappings(dest_remote, dest_channel, dest_thread_id)
+            "#,
+        )
+        .execute(&pool)
+        .await
+        .context("Failed to create idx_thread_dest index")?;
+
         info!("Database initialized successfully at {}", db_path);
 
         Ok(Self { pool })
@@ -143,6 +173,66 @@ impl MessageMappingDb {
         .context("Failed to cleanup old mappings")?;
 
         Ok(result.rows_affected())
+    }
+
+    pub async fn insert_thread_mapping(
+        &self,
+        source_remote: &str,
+        source_channel: &str,
+        source_thread_id: &str,
+        dest_remote: &str,
+        dest_channel: &str,
+        dest_thread_id: &str,
+    ) -> Result<()> {
+        let created_at = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        sqlx::query(
+            r#"
+            INSERT INTO thread_mappings
+            (source_remote, source_channel, source_thread_id, dest_remote, dest_channel, dest_thread_id, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            "#,
+        )
+        .bind(source_remote)
+        .bind(source_channel)
+        .bind(source_thread_id)
+        .bind(dest_remote)
+        .bind(dest_channel)
+        .bind(dest_thread_id)
+        .bind(created_at)
+        .execute(&self.pool)
+        .await
+        .context("Failed to insert thread mapping")?;
+
+        Ok(())
+    }
+
+    pub async fn lookup_thread_mapping(
+        &self,
+        source_remote: &str,
+        source_channel: &str,
+        source_thread_id: &str,
+        dest_remote: &str,
+    ) -> Result<Option<(String, String)>> {
+        let row = sqlx::query_as::<_, (String, String)>(
+            r#"
+            SELECT dest_channel, dest_thread_id
+            FROM thread_mappings
+            WHERE source_remote = ? AND source_channel = ? AND source_thread_id = ? AND dest_remote = ?
+            "#,
+        )
+        .bind(source_remote)
+        .bind(source_channel)
+        .bind(source_thread_id)
+        .bind(dest_remote)
+        .fetch_optional(&self.pool)
+        .await
+        .context("Failed to lookup thread mapping")?;
+
+        Ok(row)
     }
 
     pub fn start_cleanup_task(db: Arc<Self>, days: u32) {

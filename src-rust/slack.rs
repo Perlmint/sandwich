@@ -174,6 +174,11 @@ impl SlackRemote {
             return;
         }
 
+        // Filter out thread_broadcast messages (replies also sent to channel)
+        if message_event.subtype == Some(SlackMessageEventType::ThreadBroadcast) {
+            return;
+        }
+
         let Some(ref user_id) = message_event.sender.user else {
             return;
         };
@@ -251,6 +256,22 @@ impl SlackRemote {
         // Check if this is a message edit
         let modified = message_event.subtype == Some(SlackMessageEventType::MessageChanged);
 
+        // Extract thread information
+        let (thread_id, parent_message_id) = if let Some(ref thread_ts) = message_event.origin.thread_ts {
+            let thread_ts_str = thread_ts.to_string();
+            let msg_ts_str = message_event.origin.ts.to_string();
+
+            // If thread_ts == ts, this is the parent message
+            // If thread_ts != ts, this is a reply in the thread
+            if thread_ts_str == msg_ts_str {
+                (Some(thread_ts_str), None)
+            } else {
+                (Some(thread_ts_str.clone()), Some(thread_ts_str))
+            }
+        } else {
+            (None, None)
+        };
+
         let event = MessageEvent {
             channel_id: channel_id.to_string(),
             message_id,
@@ -263,6 +284,8 @@ impl SlackRemote {
             message: transformed_message,
             files,
             modified,
+            thread_id,
+            parent_message_id,
         };
 
         let _ = event_tx.send(Event::Message(event));
@@ -385,6 +408,7 @@ impl Remote for SlackRemote {
         user_icon: &str,
         message: &str,
         files: &[AttachedFile],
+        thread_id: Option<&str>,
     ) -> Result<String> {
         let session = self.client.open_session(&self.token);
         let channel_id = SlackChannelId::new(channel.to_string());
@@ -410,7 +434,7 @@ impl Remote for SlackRemote {
             )));
         }
 
-        let request = SlackApiChatPostMessageRequest::new(
+        let mut request = SlackApiChatPostMessageRequest::new(
             channel_id,
             SlackMessageContent::new()
                 .with_text(if transformed_message.is_empty() {
@@ -422,6 +446,11 @@ impl Remote for SlackRemote {
         )
         .with_username(user_name.into())
         .with_icon_url(user_icon.into());
+
+        // Add thread_ts if this is a threaded message
+        if let Some(thread_ts) = thread_id {
+            request = request.with_thread_ts(SlackTs::new(thread_ts.into()));
+        }
 
         let response = session.chat_post_message(&request).await?;
 
@@ -435,6 +464,7 @@ impl Remote for SlackRemote {
         message_id: &str,
         message: &str,
         files: &[AttachedFile],
+        _thread_id: Option<&str>,
     ) -> Result<()> {
         let session = self.client.open_session(&self.token);
         let channel_id = SlackChannelId::new(channel.to_string());
@@ -488,6 +518,17 @@ impl Remote for SlackRemote {
                 }
             }
         }
+    }
+
+    async fn create_thread(
+        &self,
+        _channel: &str,
+        _message_id: Option<&str>,
+        _name: &str,
+    ) -> Result<String> {
+        // Slack threads are implicit - they're created automatically when
+        // you send a message with thread_ts. Return empty string as no-op.
+        Ok(String::new())
     }
 
     async fn send_message_as_bot(&self, channel: &str, message: &str) -> Result<()> {

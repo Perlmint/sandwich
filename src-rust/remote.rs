@@ -29,6 +29,8 @@ pub struct MessageEvent {
     pub message: String,
     pub files: Vec<AttachedFile>,
     pub modified: bool,
+    pub thread_id: Option<String>,
+    pub parent_message_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -77,6 +79,7 @@ pub trait Remote: Send + Sync {
         user_icon: &str,
         message: &str,
         files: &[AttachedFile],
+        thread_id: Option<&str>,
     ) -> Result<String>;
 
     async fn edit_message(
@@ -85,7 +88,15 @@ pub trait Remote: Send + Sync {
         message_id: &str,
         message: &str,
         files: &[AttachedFile],
+        thread_id: Option<&str>,
     ) -> Result<()>;
+
+    async fn create_thread(
+        &self,
+        channel: &str,
+        message_id: Option<&str>,
+        name: &str,
+    ) -> Result<String>;
 
     async fn send_message_as_bot(&self, channel: &str, message: &str) -> Result<()>;
 
