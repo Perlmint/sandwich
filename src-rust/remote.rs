@@ -22,6 +22,7 @@ pub struct AttachedFile {
 #[derive(Debug, Clone)]
 pub struct MessageEvent {
     pub channel_id: String,
+    pub message_id: Option<String>,
     pub user_name: String,
     pub user_id: String,
     pub user_icon: String,
@@ -74,6 +75,14 @@ pub trait Remote: Send + Sync {
         channel: &str,
         user_name: &str,
         user_icon: &str,
+        message: &str,
+        files: &[AttachedFile],
+    ) -> Result<String>;
+
+    async fn edit_message(
+        &self,
+        channel: &str,
+        message_id: &str,
         message: &str,
         files: &[AttachedFile],
     ) -> Result<()>;

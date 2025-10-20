@@ -57,12 +57,55 @@ impl EventHandler for Handler {
 
         let event = MessageEvent {
             channel_id: msg.channel_id.to_string(),
+            message_id: Some(msg.id.to_string()),
             user_name: msg.author.name.clone(),
             user_id: msg.author.id.to_string(),
             user_icon: msg.author.face(),
             message,
             files,
             modified: msg.edited_timestamp.is_some(),
+        };
+
+        let _ = self.event_tx.send(Event::Message(event));
+    }
+
+    async fn message_update(
+        &self,
+        _ctx: Context,
+        _old: Option<Message>,
+        _new: Option<Message>,
+        event: serenity::model::event::MessageUpdateEvent,
+    ) {
+        // Ignore messages not in listen channels
+        if !self.listen_channels.contains_key(&event.channel_id.to_string()) {
+            return;
+        }
+
+        // Only process if we have actual content
+        let Some(content) = event.content else {
+            return;
+        };
+
+        // Get author info
+        let (user_name, user_id, user_icon) = if let Some(author) = event.author {
+            (author.name.clone(), author.id.to_string(), author.face())
+        } else {
+            // Can't process without author info
+            return;
+        };
+
+        // Transform message content
+        let message = self.transform_discord_to_internal(&content);
+
+        let event = MessageEvent {
+            channel_id: event.channel_id.to_string(),
+            message_id: Some(event.id.to_string()),
+            user_name,
+            user_id,
+            user_icon,
+            message,
+            files: vec![], // Edits typically don't include new files
+            modified: true,
         };
 
         let _ = self.event_tx.send(Event::Message(event));
@@ -279,7 +322,7 @@ impl Remote for DiscordRemote {
         user_icon: &str,
         message: &str,
         files: &[AttachedFile],
-    ) -> Result<()> {
+    ) -> Result<String> {
         let webhook = self
             .webhooks
             .get(channel)
@@ -312,8 +355,35 @@ impl Remote for DiscordRemote {
             execute_webhook = execute_webhook.files(attachments);
         }
 
-        webhook
-            .execute(&self.client.http, false, execute_webhook)
+        let sent_message = webhook
+            .execute(&self.client.http, true, execute_webhook) // wait=true to get message ID
+            .await?
+            .context("Failed to get message from webhook execution")?;
+
+        Ok(sent_message.id.to_string())
+    }
+
+    async fn edit_message(
+        &self,
+        channel: &str,
+        message_id: &str,
+        message: &str,
+        _files: &[AttachedFile],
+    ) -> Result<()> {
+        let channel_id: ChannelId = channel.parse::<u64>()?.into();
+        let msg_id: serenity::model::id::MessageId = message_id.parse::<u64>()?.into();
+
+        let transformed_message = self.transform_internal_to_discord(message);
+
+        // Note: Discord doesn't support editing attachments, only content
+        let mut edit_message = serenity::builder::EditMessage::new();
+
+        if !transformed_message.is_empty() {
+            edit_message = edit_message.content(transformed_message);
+        }
+
+        channel_id
+            .edit_message(&self.client.http, msg_id, edit_message)
             .await?;
 
         Ok(())

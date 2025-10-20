@@ -31,6 +31,7 @@ futures = "0.3"
 regex = "1.11"
 rand = "0.9"
 bytes = "1.9"
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate"] }
 
 [profile.release]
 opt-level = 3

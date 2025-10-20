@@ -12,6 +12,8 @@ pub struct Config {
     pub tts: Option<TtsConfig>,
     #[serde(default)]
     pub audio_streams: Option<Vec<AudioStreamConfig>>,
+    #[serde(default)]
+    pub database: Option<DatabaseConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -93,6 +95,13 @@ pub struct EntranceNotificationConfig {
 pub struct EntranceFormatConfig {
     pub join: Vec<String>,
     pub leave: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DatabaseConfig {
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cleanup_days: Option<u32>,
 }
 
 impl Config {
