@@ -13,10 +13,7 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use crate::config::ChannelSpec;
-use crate::remote::{
-    AttachedFile, ChannelJoinEvent, Event, EventReceiver, MessageEvent, Remote,
-    VoiceReceiver, VoiceSender,
-};
+use crate::remote::{AttachedFile, ChannelJoinEvent, Event, EventReceiver, MessageEvent, Remote};
 
 struct Handler {
     event_tx: broadcast::Sender<Event>,
@@ -35,23 +32,33 @@ impl EventHandler for Handler {
         let is_thread = matches!(
             msg.kind,
             serenity::all::MessageType::ThreadStarterMessage | serenity::all::MessageType::Regular
-        ) && msg.channel(&ctx).await.ok().map(|ch| {
-            if let serenity::all::Channel::Guild(guild_ch) = ch {
-                matches!(
-                    guild_ch.kind,
-                    serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread
-                )
-            } else {
-                false
-            }
-        }).unwrap_or(false);
+        ) && msg
+            .channel(&ctx)
+            .await
+            .ok()
+            .map(|ch| {
+                if let serenity::all::Channel::Guild(guild_ch) = ch {
+                    matches!(
+                        guild_ch.kind,
+                        serenity::all::ChannelType::PublicThread
+                            | serenity::all::ChannelType::PrivateThread
+                    )
+                } else {
+                    false
+                }
+            })
+            .unwrap_or(false);
 
         // For thread messages, the channel_id is the thread ID
         let (actual_channel_id, thread_id, parent_message_id) = if is_thread {
             // Get parent channel from the thread
             if let Ok(serenity::all::Channel::Guild(thread_channel)) = msg.channel(&ctx).await {
                 if let Some(parent_id) = thread_channel.parent_id {
-                    (parent_id.to_string(), Some(msg.channel_id.to_string()), None)
+                    (
+                        parent_id.to_string(),
+                        Some(msg.channel_id.to_string()),
+                        None,
+                    )
                 } else {
                     (msg.channel_id.to_string(), None, None)
                 }
@@ -110,22 +117,23 @@ impl EventHandler for Handler {
         event: serenity::model::event::MessageUpdateEvent,
     ) {
         // Detect if this is a thread message
-        let is_thread = if let Ok(channel) = event.channel_id.to_channel(&ctx).await {
-            if let serenity::all::Channel::Guild(guild_ch) = channel {
-                matches!(
-                    guild_ch.kind,
-                    serenity::all::ChannelType::PublicThread | serenity::all::ChannelType::PrivateThread
-                )
-            } else {
-                false
-            }
+        let is_thread = if let Ok(serenity::all::Channel::Guild(guild_ch)) =
+            event.channel_id.to_channel(&ctx).await
+        {
+            matches!(
+                guild_ch.kind,
+                serenity::all::ChannelType::PublicThread
+                    | serenity::all::ChannelType::PrivateThread
+            )
         } else {
             false
         };
 
         // For thread messages, get the parent channel
         let (actual_channel_id, thread_id) = if is_thread {
-            if let Ok(serenity::all::Channel::Guild(thread_channel)) = event.channel_id.to_channel(&ctx).await {
+            if let Ok(serenity::all::Channel::Guild(thread_channel)) =
+                event.channel_id.to_channel(&ctx).await
+            {
                 if let Some(parent_id) = thread_channel.parent_id {
                     (parent_id.to_string(), Some(event.channel_id.to_string()))
                 } else {
@@ -222,9 +230,7 @@ impl Handler {
         let mut result = message.to_string();
 
         // Convert Discord strikethrough to Slack
-        result = strikethrough_regex
-            .replace_all(&result, "~$1~")
-            .to_string();
+        result = strikethrough_regex.replace_all(&result, "~$1~").to_string();
 
         // Wrap URLs in angle brackets for Slack
         result = url_regex.replace_all(&result, "<$1>").to_string();
@@ -238,7 +244,7 @@ impl Handler {
                         format!("<@{}>", internal_id)
                     } else {
                         tracing::warn!("Unknown Discord user ID: {}", discord_id);
-                        format!("<@unknown>")
+                        "<@unknown>".to_string()
                     }
                 })
                 .to_string();
@@ -317,7 +323,7 @@ impl DiscordRemote {
                         format!("<@{}>", discord_id)
                     } else {
                         tracing::warn!("Unknown internal user ID: {}", internal_id);
-                        format!("<@unknown>")
+                        "<@unknown>".to_string()
                     }
                 })
                 .to_string();
@@ -361,7 +367,9 @@ impl Remote for DiscordRemote {
 
         // Try to create or find webhook for this channel
         if let Ok(webhooks) = channel_id.webhooks(http).await {
-            if let Some(webhook) = webhooks.iter().find(|w| w.name.as_deref() == Some("sandwich"))
+            if let Some(webhook) = webhooks
+                .iter()
+                .find(|w| w.name.as_deref() == Some("sandwich"))
             {
                 self.webhooks
                     .insert(channel_id.to_string(), webhook.clone());

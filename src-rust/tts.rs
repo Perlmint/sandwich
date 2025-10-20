@@ -11,12 +11,14 @@ use tokio::io::AsyncWriteExt;
 
 use crate::config::TtsConfig;
 
+#[allow(dead_code)]
 pub struct TtsEngine {
     client: PollyClient,
     voice_id: VoiceId,
     cache_dir: PathBuf,
 }
 
+#[allow(dead_code)]
 impl TtsEngine {
     async fn new(client: PollyClient, voice_id: VoiceId) -> Result<Self> {
         let cache_dir = PathBuf::from("tts_cache");
@@ -65,13 +67,8 @@ pub async fn init_tts(config: &TtsConfig) -> Result<TtsEngine> {
             secret_access_key,
             voice_id,
         } => {
-            let credentials = Credentials::new(
-                access_key_id,
-                secret_access_key,
-                None,
-                None,
-                "static",
-            );
+            let credentials =
+                Credentials::new(access_key_id, secret_access_key, None, None, "static");
 
             let aws_config = aws_config::defaults(BehaviorVersion::latest())
                 .region(Region::new(region.clone()))

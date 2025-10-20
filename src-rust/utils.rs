@@ -1,5 +1,6 @@
 use rand::Rng;
 
+#[allow(dead_code)]
 pub fn sample<T: Clone>(data: &[T]) -> Option<T> {
     if data.is_empty() {
         return None;
@@ -24,7 +25,9 @@ pub fn truncate_thread_name(content: &str) -> String {
     } else {
         // Find a good breaking point (space, punctuation)
         let truncated = &trimmed[..MAX_LEN];
-        if let Some(last_space) = truncated.rfind(|c: char| c.is_whitespace() || c == '.' || c == ',' || c == '!') {
+        if let Some(last_space) =
+            truncated.rfind(|c: char| c.is_whitespace() || c == '.' || c == ',' || c == '!')
+        {
             if last_space > MAX_LEN / 2 {
                 return format!("{}...", &truncated[..last_space].trim());
             }

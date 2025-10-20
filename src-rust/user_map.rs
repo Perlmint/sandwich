@@ -44,16 +44,13 @@ impl UserMap {
 
             for (remote_name, user_id) in &mapping.users {
                 maps.entry(remote_name.clone())
-                    .or_insert_with(BiHashMap::new)
+                    .or_default()
                     .insert(user_id.clone(), internal_id.clone());
             }
         }
 
         // Convert to Arc for sharing
-        let maps = maps
-            .into_iter()
-            .map(|(k, v)| (k, Arc::new(v)))
-            .collect();
+        let maps = maps.into_iter().map(|(k, v)| (k, Arc::new(v))).collect();
 
         Ok(Self { maps })
     }

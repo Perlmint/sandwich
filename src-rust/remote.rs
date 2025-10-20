@@ -15,6 +15,7 @@ pub struct UserInfo {
 pub struct AttachedFile {
     pub url: String,
     pub name: String,
+    #[allow(dead_code)]
     pub mimetype: String,
     pub data: Option<Bytes>,
 }
@@ -34,6 +35,7 @@ pub struct MessageEvent {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ChannelJoinEvent {
     pub channel_id: String,
     pub user_name: String,
@@ -43,15 +45,20 @@ pub struct ChannelJoinEvent {
 #[derive(Debug, Clone)]
 pub enum Event {
     Message(MessageEvent),
+    #[allow(dead_code)]
     JoinChannel(ChannelJoinEvent),
+    #[allow(dead_code)]
     LeaveChannel(ChannelJoinEvent),
 }
 
+#[allow(dead_code)]
 pub type EventSender = broadcast::Sender<Event>;
 pub type EventReceiver = broadcast::Receiver<Event>;
 
+#[allow(dead_code)]
 pub struct EventType;
 
+#[allow(dead_code)]
 impl EventType {
     pub const MESSAGE: &'static str = "message";
     pub const JOIN_CHANNEL: &'static str = "join_channel";
@@ -61,10 +68,12 @@ impl EventType {
 #[async_trait]
 pub trait Remote: Send + Sync {
     fn protocol(&self) -> &str;
+    #[allow(dead_code)]
     fn supports_multi_voice(&self) -> bool;
 
     async fn join_text_channel(&self, channel: &ChannelSpec) -> Result<String>;
 
+    #[allow(dead_code)]
     async fn join_voice_channel(
         &self,
         _channel: &ChannelSpec,
@@ -98,19 +107,23 @@ pub trait Remote: Send + Sync {
         name: &str,
     ) -> Result<String>;
 
+    #[allow(dead_code)]
     async fn send_message_as_bot(&self, channel: &str, message: &str) -> Result<()>;
 
     fn subscribe(&self) -> EventReceiver;
 }
 
+#[allow(dead_code)]
 pub struct VoiceReceiver {
     // TODO: Implement voice receiving if needed
 }
 
+#[allow(dead_code)]
 pub struct VoiceSender {
     // TODO: Implement with songbird
 }
 
+#[allow(dead_code)]
 impl VoiceSender {
     pub async fn play(&self, _path_or_stream: &str) -> Result<()> {
         // TODO: Implement audio playback

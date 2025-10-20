@@ -9,16 +9,15 @@ use std::sync::Arc;
 use tokio::sync::broadcast;
 
 use crate::config::ChannelSpec;
-use crate::remote::{
-    AttachedFile, Event, EventReceiver, MessageEvent, Remote,
-};
+use crate::remote::{AttachedFile, Event, EventReceiver, MessageEvent, Remote};
 
-type SCHC = SlackClientHyperHttpsConnector;
+type Schc = SlackClientHyperHttpsConnector;
 
 pub struct SlackRemote {
-    client: Arc<SlackClient<SCHC>>,
+    client: Arc<SlackClient<Schc>>,
     token: SlackApiToken,
     event_tx: broadcast::Sender<Event>,
+    #[allow(dead_code)]
     user_cache: Arc<DashMap<SlackUserId, SlackUser>>,
     channel_cache: Arc<DashMap<SlackChannelId, SlackChannelInfo>>,
     user_map: Option<Arc<BiHashMap<String, String>>>,
@@ -28,28 +27,19 @@ pub struct SlackRemote {
 // Free function for handling push events
 async fn handle_push_event(
     callback_data: SlackPushEventCallback,
-    _client: Arc<SlackClient<SCHC>>,
+    _client: Arc<SlackClient<Schc>>,
     state: SlackClientEventsUserState,
 ) -> UserCallbackResult<()> {
-    match &callback_data.event {
-        SlackEventCallbackBody::Message(message_event) => {
-            let state_guard = state.read().await;
+    if let SlackEventCallbackBody::Message(message_event) = &callback_data.event {
+        let state_guard = state.read().await;
 
-            if let (Some(event_tx), Some(user_cache), Some(user_map)) = (
-                state_guard.get_user_state::<broadcast::Sender<Event>>(),
-                state_guard.get_user_state::<Arc<DashMap<SlackUserId, SlackUser>>>(),
-                state_guard.get_user_state::<Option<Arc<BiHashMap<String, String>>>>(),
-            ) {
-                SlackRemote::handle_message_event(
-                    message_event,
-                    event_tx,
-                    user_cache,
-                    user_map,
-                )
-                .await;
-            }
+        if let (Some(event_tx), Some(user_cache), Some(user_map)) = (
+            state_guard.get_user_state::<broadcast::Sender<Event>>(),
+            state_guard.get_user_state::<Arc<DashMap<SlackUserId, SlackUser>>>(),
+            state_guard.get_user_state::<Option<Arc<BiHashMap<String, String>>>>(),
+        ) {
+            SlackRemote::handle_message_event(message_event, event_tx, user_cache, user_map).await;
         }
-        _ => {}
     }
 
     UserCallbackResult::Ok(())
@@ -76,17 +66,18 @@ impl SlackRemote {
         Self::update_channel_cache(&client, &token, &channel_cache).await?;
 
         // Set up socket mode listener
-        let socket_mode_callbacks = SlackSocketModeListenerCallbacks::new()
-            .with_push_events(handle_push_event);
+        let socket_mode_callbacks =
+            SlackSocketModeListenerCallbacks::new().with_push_events(handle_push_event);
 
         let mut user_state_storage = SlackClientEventsUserStateStorage::new();
         user_state_storage.set_user_state(event_tx.clone());
         user_state_storage.set_user_state(user_cache.clone());
         user_state_storage.set_user_state(user_map.clone());
 
-        let listener_environment =
-            Arc::new(SlackClientEventsListenerEnvironment::new(client.clone())
-                .with_user_state(SlackClientEventsUserState::new(user_state_storage)));
+        let listener_environment = Arc::new(
+            SlackClientEventsListenerEnvironment::new(client.clone())
+                .with_user_state(SlackClientEventsUserState::new(user_state_storage)),
+        );
 
         let socket_mode_listener = SlackClientSocketModeListener::new(
             &SlackClientSocketModeConfig::new(),
@@ -114,7 +105,7 @@ impl SlackRemote {
     }
 
     async fn update_user_cache(
-        client: &SlackClient<SCHC>,
+        client: &SlackClient<Schc>,
         token: &SlackApiToken,
         cache: &DashMap<SlackUserId, SlackUser>,
     ) -> Result<()> {
@@ -139,7 +130,7 @@ impl SlackRemote {
     }
 
     async fn update_channel_cache(
-        client: &SlackClient<SCHC>,
+        client: &SlackClient<Schc>,
         token: &SlackApiToken,
         cache: &DashMap<SlackChannelId, SlackChannelInfo>,
     ) -> Result<()> {
@@ -192,7 +183,7 @@ impl SlackRemote {
             return;
         };
 
-        let Some(ref text) = message_event.content.as_ref().and_then(|c| c.text.as_ref()) else {
+        let Some(text) = message_event.content.as_ref().and_then(|c| c.text.as_ref()) else {
             return;
         };
 
@@ -257,20 +248,21 @@ impl SlackRemote {
         let modified = message_event.subtype == Some(SlackMessageEventType::MessageChanged);
 
         // Extract thread information
-        let (thread_id, parent_message_id) = if let Some(ref thread_ts) = message_event.origin.thread_ts {
-            let thread_ts_str = thread_ts.to_string();
-            let msg_ts_str = message_event.origin.ts.to_string();
+        let (thread_id, parent_message_id) =
+            if let Some(ref thread_ts) = message_event.origin.thread_ts {
+                let thread_ts_str = thread_ts.to_string();
+                let msg_ts_str = message_event.origin.ts.to_string();
 
-            // If thread_ts == ts, this is the parent message
-            // If thread_ts != ts, this is a reply in the thread
-            if thread_ts_str == msg_ts_str {
-                (Some(thread_ts_str), None)
+                // If thread_ts == ts, this is the parent message
+                // If thread_ts != ts, this is a reply in the thread
+                if thread_ts_str == msg_ts_str {
+                    (Some(thread_ts_str), None)
+                } else {
+                    (Some(thread_ts_str.clone()), Some(thread_ts_str))
+                }
             } else {
-                (Some(thread_ts_str.clone()), Some(thread_ts_str))
-            }
-        } else {
-            (None, None)
-        };
+                (None, None)
+            };
 
         let event = MessageEvent {
             channel_id: channel_id.to_string(),
@@ -318,7 +310,7 @@ impl SlackRemote {
                         format!("<@{}>", internal_id)
                     } else {
                         tracing::warn!("Unknown Slack user ID: {}", slack_id);
-                        format!("<@unknown>")
+                        "<@unknown>".to_string()
                     }
                 })
                 .to_string();
@@ -348,7 +340,7 @@ impl SlackRemote {
                         format!("<@{}>", slack_id)
                     } else {
                         tracing::warn!("Unknown internal user ID: {}", internal_id);
-                        format!("<@unknown>")
+                        "<@unknown>".to_string()
                     }
                 })
                 .to_string();
@@ -440,7 +432,7 @@ impl Remote for SlackRemote {
                 .with_text(if transformed_message.is_empty() {
                     " ".into()
                 } else {
-                    transformed_message.into()
+                    transformed_message
                 })
                 .with_blocks(blocks),
         )
@@ -497,7 +489,7 @@ impl Remote for SlackRemote {
                 .with_text(if transformed_message.is_empty() {
                     " ".into()
                 } else {
-                    transformed_message.into()
+                    transformed_message
                 })
                 .with_blocks(blocks),
             ts,
@@ -508,7 +500,9 @@ impl Remote for SlackRemote {
             Err(e) => {
                 // Check if the error is because the message was not found or too old
                 let error_str = e.to_string();
-                if error_str.contains("message_not_found") || error_str.contains("cant_update_message") {
+                if error_str.contains("message_not_found")
+                    || error_str.contains("cant_update_message")
+                {
                     // Slack free tier discards old messages - log and ignore
                     tracing::warn!("Cannot edit Slack message {}: {}", message_id, e);
                     Ok(())
