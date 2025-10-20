@@ -1,0 +1,38 @@
+[package]
+name = "sandwich"
+version = "0.1.0"
+edition = "2021"
+authors = ["perlmint"]
+description = "Multi-purpose Discord-Slack bridge bot"
+license = "MIT"
+
+[[bin]]
+name = "sandwich"
+path = "src-rust/main.rs"
+
+[dependencies]
+tokio = { version = "1.41", features = ["full"] }
+async-trait = "0.1"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.9"
+serenity = { version = "0.12", features = ["client", "gateway", "rustls_backend", "model", "cache"] }
+songbird = "0.5"
+slack-morphism = { version = "2.5", features = ["hyper"] }
+aws-sdk-polly = "1.56"
+aws-config = "1.5"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dashmap = "6.1"
+bimap = "0.6"
+reqwest = "0.12"
+futures = "0.3"
+regex = "1.11"
+rand = "0.9"
+bytes = "1.9"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
